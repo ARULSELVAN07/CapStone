@@ -1,0 +1,19 @@
+# Node dependencies (re-installed inside Docker via npm ci)
+frontend/node_modules
+backend/target
+
+# Git
+.git
+.gitignore
+
+# IDE / OS
+.idea
+.vscode
+*.DS_Store
+
+# Logs
+*.log
+
+# Docker files themselves
+docker-compose*.yml
+.dockerignore

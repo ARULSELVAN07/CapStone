@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sparehub-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sparehub_db}
+      POSTGRES_USER: ${POSTGRES_USER:-sparehub_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sparehub_secure_pass_2026}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./database/seed/01_users.sql:/docker-entrypoint-initdb.d/02_users.sql
+      - ./database/seed/02_vehicle_models.sql:/docker-entrypoint-initdb.d/03_models.sql
+      - ./database/seed/03_categories.sql:/docker-entrypoint-initdb.d/04_categories.sql
+      - ./database/seed/04_products.sql:/docker-entrypoint-initdb.d/05_products.sql
+      - ./database/seed/05_compatibility.sql:/docker-entrypoint-initdb.d/06_compatibility.sql
+      - ./database/seed/06_inventory.sql:/docker-entrypoint-initdb.d/07_inventory.sql
+      - ./database/seed/07_technicians.sql:/docker-entrypoint-initdb.d/08_technicians.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sparehub_user} -d ${POSTGRES_DB:-sparehub_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    container_name: sparehub-backend
+    restart: always
+    ports:
+      - "8081:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-sparehub_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-sparehub_user}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-sparehub_secure_pass_2026}
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      DEV_MODE_OTP_ENABLED: ${DEV_MODE_OTP_ENABLED:-true}
+      DEV_MODE_OTP: ${DEV_MODE_OTP:-123456}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        VITE_API_BASE_URL: /api/v1
+    container_name: sparehub-frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

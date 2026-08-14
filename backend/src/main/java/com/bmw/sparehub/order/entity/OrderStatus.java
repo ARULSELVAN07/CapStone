@@ -1,0 +1,17 @@
+package com.bmw.sparehub.order.entity;
+
+public enum OrderStatus {
+    PENDING,
+    CONFIRMED,
+    PACKED,
+    READY_FOR_PICKUP,
+    PICKED_UP,
+    OUT_FOR_DELIVERY,
+    DELIVERED,
+    TECHNICIAN_ASSIGNED,
+    INSTALLATION_SCHEDULED,
+    INSTALLATION_IN_PROGRESS,
+    INSTALLATION_COMPLETED,
+    COMPLETED,
+    CANCELLED
+}

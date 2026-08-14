@@ -1,0 +1,47 @@
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: bmw-sparehub
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/sparehub_db}
+    username: ${SPRING_DATASOURCE_USERNAME:sparehub_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:sparehub_secure_pass_2026}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:noreply@sparehub.local}
+    password: ${MAIL_PASSWORD:secret}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+    expiration-ms: ${JWT_EXPIRATION:86400000} # 24 Hours
+  otp:
+    expiry-minutes: ${OTP_EXPIRY_MINUTES:10}
+    dev-mode-enabled: ${DEV_MODE_OTP_ENABLED:true}
+    dev-mode-code: ${DEV_MODE_OTP:123456}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

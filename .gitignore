@@ -1,0 +1,28 @@
+# IDE & System
+.idea/
+.vscode/
+*.swp
+*.DS_Store
+Thumbs.db
+
+# Backend (Maven & Spring Boot)
+backend/target/
+backend/*.log
+backend/.mvn/
+backend/.classpath
+backend/.project
+backend/.settings/
+
+# Frontend (Node & Vite)
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/*.local
+
+# Environment & Secrets
+.env
+.env.local
+*.pem
+
+# Docker
+docker/data/

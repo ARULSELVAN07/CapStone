@@ -1,0 +1,8 @@
+-- 07_technicians.sql Seed Data
+
+INSERT INTO technicians (id, user_id, name, phone, email, status)
+VALUES 
+('t1111111-1111-1111-1111-111111111111', '33333333-3333-3333-3333-333333333331', 'Suresh Kumar', '+919811122233', 'tech1001@sparehub.local', 'AVAILABLE'),
+('t2222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333332', 'Amit Patel', '+919811122234', 'tech1002@sparehub.local', 'AVAILABLE'),
+('t3333333-3333-3333-3333-333333333333', '33333333-3333-3333-3333-333333333333', 'Rohan Mehta', '+919811122235', 'tech1003@sparehub.local', 'BUSY')
+ON CONFLICT (id) DO NOTHING;
