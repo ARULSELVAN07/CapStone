@@ -22,6 +22,11 @@ export const technicianService = {
     return res.data.data;
   },
 
+  async claimJob(jobId: string): Promise<any> {
+    const res = await api.put<ApiResponse<any>>(`/technician/jobs/${jobId}/claim`);
+    return res.data.data;
+  },
+
   async changePassword(oldPassword: string, newPassword: string, confirmNewPassword: string): Promise<void> {
     await api.post('/auth/change-password', { oldPassword, newPassword, confirmNewPassword });
   }

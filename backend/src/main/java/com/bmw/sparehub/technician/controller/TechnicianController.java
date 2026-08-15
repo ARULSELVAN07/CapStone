@@ -52,6 +52,15 @@ public class TechnicianController {
         return ResponseEntity.ok(ApiResponse.success(job));
     }
 
+    @PutMapping("/jobs/{id}/claim")
+    public ResponseEntity<ApiResponse<InstallationJobDto>> claimJob(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable UUID id
+    ) {
+        InstallationJobDto job = technicianService.claimJob(id, userPrincipal.getId());
+        return ResponseEntity.ok(ApiResponse.success(job, "Installation job claimed successfully"));
+    }
+
     @PutMapping("/jobs/{id}/status")
     public ResponseEntity<ApiResponse<InstallationJobDto>> updateJobStatus(
             @AuthenticationPrincipal UserPrincipal userPrincipal,

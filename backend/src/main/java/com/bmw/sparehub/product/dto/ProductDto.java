@@ -24,6 +24,7 @@ public class ProductDto {
     private BigDecimal price;
     private Integer warrantyMonths;
     private String imageUrl;
+    private Double rating;
     private String status;
     private Integer availableQuantity;
     private String stockStatus; // IN_STOCK, LOW_STOCK, OUT_OF_STOCK

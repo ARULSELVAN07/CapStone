@@ -67,7 +67,14 @@ public class CartService {
             throw new BadRequestException("Product is currently OUT OF STOCK");
         }
 
-        CartItem existingItem = cartItemRepository.findByCartIdAndProductId(cart.getId(), product.getId()).orElse(null);
+        if (cart.getItems() == null) {
+            cart.setItems(new ArrayList<>());
+        }
+
+        CartItem existingItem = cart.getItems().stream()
+                .filter(i -> i.getProduct().getId().equals(product.getId()))
+                .findFirst()
+                .orElse(null);
 
         int targetQuantity = request.getQuantity();
         if (existingItem != null) {
@@ -80,18 +87,18 @@ public class CartService {
 
         if (existingItem != null) {
             existingItem.setQuantity(targetQuantity);
-            cartItemRepository.save(existingItem);
         } else {
             CartItem newItem = CartItem.builder()
                     .cart(cart)
                     .product(product)
                     .quantity(request.getQuantity())
                     .build();
-            cartItemRepository.save(newItem);
+            cart.getItems().add(newItem);
         }
 
+        cart = cartRepository.saveAndFlush(cart);
         log.info("User {} added product {} to cart (qty: {})", userId, product.getPartNumber(), request.getQuantity());
-        return getOrCreateCart(userId);
+        return mapToDto(cart);
     }
 
     @Transactional
@@ -99,12 +106,18 @@ public class CartService {
         Cart cart = cartRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cart for user: " + userId));
 
-        CartItem item = cartItemRepository.findById(itemId)
-                .orElseThrow(() -> new ResourceNotFoundException("CartItem", "id", itemId));
-
-        if (!item.getCart().getId().equals(cart.getId())) {
-            throw new BadRequestException("Cart item does not belong to user cart");
+        if (request.getQuantity() <= 0) {
+            return removeCartItem(userId, itemId);
         }
+
+        if (cart.getItems() == null) {
+            throw new ResourceNotFoundException("CartItem", "id", itemId);
+        }
+
+        CartItem item = cart.getItems().stream()
+                .filter(i -> i.getId() != null && i.getId().equals(itemId))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("CartItem", "id", itemId));
 
         Inventory inv = inventoryRepository.findByProductId(item.getProduct().getId()).orElse(null);
         int available = inv != null ? inv.getAvailableQuantity() : 0;
@@ -114,9 +127,9 @@ public class CartService {
         }
 
         item.setQuantity(request.getQuantity());
-        cartItemRepository.save(item);
+        cart = cartRepository.saveAndFlush(cart);
 
-        return getOrCreateCart(userId);
+        return mapToDto(cart);
     }
 
     @Transactional
@@ -124,21 +137,22 @@ public class CartService {
         Cart cart = cartRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cart for user: " + userId));
 
-        CartItem item = cartItemRepository.findById(itemId)
-                .orElseThrow(() -> new ResourceNotFoundException("CartItem", "id", itemId));
-
-        if (item.getCart().getId().equals(cart.getId())) {
-            cartItemRepository.delete(item);
+        if (cart.getItems() != null) {
+            cart.getItems().removeIf(item -> item.getId() != null && item.getId().equals(itemId));
         }
 
-        return getOrCreateCart(userId);
+        cart = cartRepository.saveAndFlush(cart);
+        return mapToDto(cart);
     }
 
     @Transactional
     public void clearCart(UUID userId) {
         Cart cart = cartRepository.findByUserId(userId).orElse(null);
         if (cart != null) {
-            cartItemRepository.deleteByCartId(cart.getId());
+            if (cart.getItems() != null) {
+                cart.getItems().clear();
+            }
+            cartRepository.saveAndFlush(cart);
         }
     }
 

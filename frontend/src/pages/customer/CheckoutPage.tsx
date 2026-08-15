@@ -58,10 +58,13 @@ const CheckoutPage: React.FC = () => {
       if (activeVehicle) payload.vehicleId = activeVehicle.id;
       if (fulfillment === 'DELIVERY' || fulfillment === 'INSTALLATION') {
         payload.address = address;
+        payload.newAddress = address;
       }
       if (fulfillment === 'PICKUP') {
         payload.pickupDate = pickupDate;
         payload.pickupTimeSlot = pickupTimeSlot;
+        payload.appointmentDate = pickupDate;
+        payload.appointmentTimeSlot = pickupTimeSlot;
       }
       const order = await orderService.placeOrder(payload);
       navigate(`/customer/orders/${order.id}`, { state: { newOrder: true } });

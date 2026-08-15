@@ -71,6 +71,15 @@ export const TechnicianJobs: React.FC = () => {
     }
   };
 
+  const handleClaimJob = async (jobId: string) => {
+    try {
+      await technicianService.claimJob(jobId);
+      fetchJobs();
+    } catch (err: any) {
+      alert(err?.response?.data?.message || 'Failed to claim installation job');
+    }
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div>
@@ -109,12 +118,22 @@ export const TechnicianJobs: React.FC = () => {
                   <h3 className="text-lg font-bold text-white mt-1">Order #{job.order?.orderNumber || 'SP-ORD-01'}</h3>
                 </div>
 
-                <button
-                  onClick={() => handleOpenModal(job)}
-                  className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition-all shadow"
-                >
-                  Update Job Status & Checklist
-                </button>
+                <div className="flex items-center gap-2">
+                  {(!job.technician || job.status === 'PENDING') && (
+                    <button
+                      onClick={() => handleClaimJob(job.id)}
+                      className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all shadow"
+                    >
+                      Claim Job
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleOpenModal(job)}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition-all shadow"
+                  >
+                    Update Job Status & Checklist
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-slate-300">

@@ -24,11 +24,11 @@ export const AdminCompatibility: React.FC = () => {
       ]);
       setProducts(prodsRes.content);
       setVehicleModels(modelsRes);
-      if (prodsRes.content.length > 0 && !selectedProductId) {
-        setSelectedProductId(prodsRes.content[0].id);
+      if (prodsRes.content.length > 0) {
+        setSelectedProductId(prev => prev && prodsRes.content.some(p => p.id === prev) ? prev : prodsRes.content[0].id);
       }
-      if (modelsRes.length > 0 && !selectedModelId) {
-        setSelectedModelId(modelsRes[0].id);
+      if (modelsRes.length > 0) {
+        setSelectedModelId(prev => prev && modelsRes.some(m => m.id === prev) ? prev : modelsRes[0].id);
       }
     } catch (e) {
       console.error(e);
@@ -43,14 +43,17 @@ export const AdminCompatibility: React.FC = () => {
 
   const handleAddCompatibility = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedProductId || !selectedModelId) return;
+    if (!selectedProductId || !selectedModelId) {
+      setMsg({ type: 'error', text: 'Please select both a spare part and a BMW vehicle model.' });
+      return;
+    }
     setSubmitting(true);
     setMsg(null);
     try {
-      await adminService.addCompatibility(selectedProductId, selectedModelId, notes);
+      await adminService.addCompatibility(selectedProductId, selectedModelId, notes.trim() || undefined);
       setMsg({ type: 'success', text: 'Vehicle compatibility mapping added successfully!' });
       setNotes('');
-      fetchData();
+      await fetchData();
     } catch (err: any) {
       setMsg({ type: 'error', text: err.response?.data?.message || 'Failed to map compatibility' });
     } finally {
@@ -92,7 +95,7 @@ export const AdminCompatibility: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleAddCompatibility} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+        <form onSubmit={handleAddCompatibility} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-1">Select Spare Part</label>
             <select
@@ -100,6 +103,7 @@ export const AdminCompatibility: React.FC = () => {
               onChange={(e) => setSelectedProductId(e.target.value)}
               className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500"
             >
+              {products.length === 0 && <option value="">No parts found</option>}
               {products.map((p) => (
                 <option key={p.id} value={p.id}>{p.name} ({p.partNumber})</option>
               ))}
@@ -113,6 +117,7 @@ export const AdminCompatibility: React.FC = () => {
               onChange={(e) => setSelectedModelId(e.target.value)}
               className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500"
             >
+              {vehicleModels.length === 0 && <option value="">No BMW models found</option>}
               {vehicleModels.map((m) => (
                 <option key={m.id} value={m.id}>{m.modelName} [{m.modelCode}] ({m.modelYear})</option>
               ))}
@@ -120,9 +125,20 @@ export const AdminCompatibility: React.FC = () => {
           </div>
 
           <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1">Fitment Notes (Optional)</label>
+            <input
+              type="text"
+              placeholder="e.g. Front axle only / M Sport"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500"
+            />
+          </div>
+
+          <div>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || products.length === 0 || vehicleModels.length === 0}
               className="w-full flex items-center justify-center gap-2 px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm font-medium transition-all disabled:opacity-50"
             >
               <Plus className="w-4 h-4" />

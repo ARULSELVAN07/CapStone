@@ -238,6 +238,12 @@ public class OrderService {
                 .toList();
     }
 
+    public PageResponse<OrderDto> getMyOrdersPaginated(UUID userId, Pageable pageable) {
+        Page<Order> page = orderRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
+        List<OrderDto> mapped = page.getContent().stream().map(this::mapToDto).toList();
+        return PageResponse.from(page, mapped);
+    }
+
     public OrderDto getOrderById(UUID orderId, UUID userId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
@@ -248,7 +254,6 @@ public class OrderService {
         return mapToDto(order);
     }
 
-    // Admin Queries & Management
     public PageResponse<OrderDto> filterAdminOrders(String statusStr, String fulfillmentStr, String search, Pageable pageable) {
         OrderStatus status = null;
         if (statusStr != null && !statusStr.isBlank()) {
@@ -260,13 +265,43 @@ public class OrderService {
             try { fulfillment = FulfillmentType.valueOf(fulfillmentStr); } catch (Exception ignored) {}
         }
 
-        Page<Order> page = orderRepository.filterOrders(status, fulfillment, search, pageable);
+        final OrderStatus finalStatus = status;
+        final FulfillmentType finalFulfillment = fulfillment;
+
+        org.springframework.data.jpa.domain.Specification<Order> spec = (root, query, cb) -> {
+            java.util.List<jakarta.persistence.criteria.Predicate> predicates = new java.util.ArrayList<>();
+
+            if (finalStatus != null) {
+                predicates.add(cb.equal(root.get("status"), finalStatus));
+            }
+
+            if (finalFulfillment != null) {
+                predicates.add(cb.equal(root.get("fulfillmentType"), finalFulfillment));
+            }
+
+            if (search != null && !search.trim().isEmpty()) {
+                String pattern = "%" + search.trim().toLowerCase() + "%";
+                jakarta.persistence.criteria.Predicate orderNumMatch = cb.like(cb.lower(root.get("orderNumber")), pattern);
+                jakarta.persistence.criteria.Predicate userNameMatch = cb.like(cb.lower(root.get("user").get("name")), pattern);
+                jakarta.persistence.criteria.Predicate userEmailMatch = cb.like(cb.lower(root.get("user").get("email")), pattern);
+                predicates.add(cb.or(orderNumMatch, userNameMatch, userEmailMatch));
+            }
+
+            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+
+        Page<Order> page = orderRepository.findAll(spec, pageable);
         List<OrderDto> mapped = page.getContent().stream().map(this::mapToDto).toList();
         return PageResponse.from(page, mapped);
     }
 
     @Transactional
     public OrderDto updateOrderStatus(UUID orderId, String newStatusStr, UUID adminUserId) {
+        return updateOrderStatus(orderId, newStatusStr, null, adminUserId);
+    }
+
+    @Transactional
+    public OrderDto updateOrderStatus(UUID orderId, String newStatusStr, String notes, UUID adminUserId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
@@ -279,6 +314,7 @@ public class OrderService {
 
         validateStatusTransition(order.getStatus(), nextStatus, order.getFulfillmentType());
 
+        OrderStatus previousStatus = order.getStatus();
         order.setStatus(nextStatus);
         orderRepository.save(order);
 
@@ -289,8 +325,11 @@ public class OrderService {
             }
         }
 
-        auditLogService.logAction(adminUserId, "ORDER_STATUS_CHANGED", "ORDER", orderId.toString(),
-                "Changed status from " + order.getStatus() + " to " + nextStatus);
+        String description = "Changed status from " + previousStatus + " to " + nextStatus;
+        if (notes != null && !notes.isBlank()) {
+            description += ". Notes: " + notes;
+        }
+        auditLogService.logAction(adminUserId, "ORDER_STATUS_CHANGED", "ORDER", orderId.toString(), description);
 
         return mapToDto(order);
     }
@@ -305,7 +344,19 @@ public class OrderService {
         }
 
         Technician technician = technicianRepository.findById(technicianId)
-                .orElseThrow(() -> new ResourceNotFoundException("Technician", "id", technicianId));
+                .or(() -> technicianRepository.findByUserId(technicianId))
+                .orElseGet(() -> {
+                    User user = userRepository.findById(technicianId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Technician", "id", technicianId));
+                    Technician newTech = Technician.builder()
+                            .user(user)
+                            .name(user.getName())
+                            .phone(user.getPhone())
+                            .email(user.getEmail())
+                            .status(com.bmw.sparehub.technician.entity.TechnicianStatus.AVAILABLE)
+                            .build();
+                    return technicianRepository.save(newTech);
+                });
 
         InstallationJob job = installationJobRepository.findByOrderId(orderId)
                 .orElseGet(() -> InstallationJob.builder().order(order).build());
@@ -322,6 +373,34 @@ public class OrderService {
 
         auditLogService.logAction(adminUserId, "TECHNICIAN_ASSIGNED", "ORDER", orderId.toString(),
                 "Assigned technician " + technician.getName() + " to installation job");
+
+        return mapToDto(order);
+    }
+
+    @Transactional
+    public OrderDto cancelOrder(UUID orderId, UUID userId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+
+        if (!order.getUser().getId().equals(userId) && !order.getUser().getRole().name().equals("ADMIN")) {
+            throw new BadRequestException("Unauthorized to cancel this order");
+        }
+
+        if (order.getStatus() == OrderStatus.COMPLETED || order.getStatus() == OrderStatus.CANCELLED) {
+            throw new BadRequestException("Cannot cancel an order that is already " + order.getStatus());
+        }
+
+        OrderStatus previousStatus = order.getStatus();
+        order.setStatus(OrderStatus.CANCELLED);
+        orderRepository.save(order);
+
+        // Release reserved stock back to inventory
+        for (OrderItem item : order.getItems()) {
+            inventoryService.releaseReservedStock(item.getProduct().getId(), item.getQuantity());
+        }
+
+        auditLogService.logAction(userId, "ORDER_CANCELLED", "ORDER", orderId.toString(),
+                "Order cancelled (was " + previousStatus + ")");
 
         return mapToDto(order);
     }

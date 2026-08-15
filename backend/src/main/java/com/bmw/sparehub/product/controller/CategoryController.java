@@ -26,6 +26,13 @@ public class CategoryController {
         return ResponseEntity.ok(ApiResponse.success(categories));
     }
 
+    @GetMapping("/admin/categories/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<CategoryDto>>> getAllCategoriesAdmin() {
+        List<CategoryDto> categories = productService.getAllCategoriesAdmin();
+        return ResponseEntity.ok(ApiResponse.success(categories));
+    }
+
     @PostMapping("/admin/categories")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CategoryDto>> createCategory(
@@ -34,5 +41,26 @@ public class CategoryController {
     ) {
         CategoryDto created = productService.createCategory(request, userPrincipal.getId());
         return ResponseEntity.ok(ApiResponse.success(created, "Category created successfully"));
+    }
+
+    @PutMapping("/admin/categories/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<CategoryDto>> updateCategory(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable java.util.UUID id,
+            @Valid @RequestBody CategoryDto request
+    ) {
+        CategoryDto updated = productService.updateCategory(id, request, userPrincipal.getId());
+        return ResponseEntity.ok(ApiResponse.success(updated, "Category updated successfully"));
+    }
+
+    @DeleteMapping("/admin/categories/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteCategory(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable java.util.UUID id
+    ) {
+        productService.deleteCategory(id, userPrincipal.getId());
+        return ResponseEntity.ok(ApiResponse.success(null, "Category deactivated successfully"));
     }
 }

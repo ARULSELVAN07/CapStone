@@ -39,9 +39,22 @@ public class TechnicianService {
     private final OrderService orderService;
     private final AuditLogService auditLogService;
 
+    private final com.bmw.sparehub.user.repository.UserRepository userRepository;
+
     public TechnicianDto getTechnicianProfileByUserId(UUID userId) {
         Technician tech = technicianRepository.findByUserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Technician profile not found for user: " + userId));
+                .orElseGet(() -> {
+                    com.bmw.sparehub.user.entity.User user = userRepository.findById(userId)
+                            .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+                    Technician created = Technician.builder()
+                            .user(user)
+                            .name(user.getName())
+                            .phone(user.getPhone())
+                            .email(user.getEmail())
+                            .status(TechnicianStatus.AVAILABLE)
+                            .build();
+                    return technicianRepository.save(created);
+                });
         return mapTechToDto(tech);
     }
 
@@ -52,7 +65,7 @@ public class TechnicianService {
     }
 
     public PageResponse<InstallationJobDto> getAssignedJobsForTechnician(UUID techUserId, Pageable pageable) {
-        Page<InstallationJob> page = installationJobRepository.findByTechnicianUserIdOrderByCreatedAtDesc(techUserId, pageable);
+        Page<InstallationJob> page = installationJobRepository.findByTechnicianUserIdOrTechnicianIsNullOrderByCreatedAtDesc(techUserId, pageable);
         List<InstallationJobDto> mapped = page.getContent().stream()
                 .map(this::mapJobToDto)
                 .toList();
@@ -63,10 +76,41 @@ public class TechnicianService {
         InstallationJob job = installationJobRepository.findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("InstallationJob", "id", jobId));
 
-        if (job.getTechnician() != null && job.getTechnician().getUser() != null 
-                && !job.getTechnician().getUser().getId().equals(techUserId)) {
-            throw new BadRequestException("This installation job is assigned to another technician");
+        return mapJobToDto(job);
+    }
+
+    @Transactional
+    public InstallationJobDto claimJob(UUID jobId, UUID techUserId) {
+        InstallationJob job = installationJobRepository.findById(jobId)
+                .orElseThrow(() -> new ResourceNotFoundException("InstallationJob", "id", jobId));
+
+        Technician tech = technicianRepository.findByUserId(techUserId).orElseGet(() -> {
+            com.bmw.sparehub.user.entity.User user = userRepository.findById(techUserId)
+                    .orElseThrow(() -> new ResourceNotFoundException("User", "id", techUserId));
+            Technician newTech = Technician.builder()
+                    .user(user)
+                    .name(user.getName())
+                    .phone(user.getPhone())
+                    .email(user.getEmail())
+                    .status(TechnicianStatus.AVAILABLE)
+                    .build();
+            return technicianRepository.save(newTech);
+        });
+
+        job.setTechnician(tech);
+        if (job.getStatus() == JobStatus.PENDING) {
+            job.setStatus(JobStatus.ASSIGNED);
         }
+        installationJobRepository.save(job);
+
+        Order order = job.getOrder();
+        if (order.getStatus() == OrderStatus.PENDING || order.getStatus() == OrderStatus.CONFIRMED || order.getStatus() == OrderStatus.PACKED) {
+            order.setStatus(OrderStatus.TECHNICIAN_ASSIGNED);
+            orderRepository.save(order);
+        }
+
+        auditLogService.logAction(techUserId, "JOB_CLAIMED", "JOB", jobId.toString(),
+                "Technician " + tech.getName() + " claimed installation job");
 
         return mapJobToDto(job);
     }
@@ -75,6 +119,22 @@ public class TechnicianService {
     public InstallationJobDto updateJobStatus(UUID jobId, UpdateJobStatusRequest request, UUID techUserId) {
         InstallationJob job = installationJobRepository.findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("InstallationJob", "id", jobId));
+
+        if (job.getTechnician() == null) {
+            Technician tech = technicianRepository.findByUserId(techUserId).orElseGet(() -> {
+                com.bmw.sparehub.user.entity.User user = userRepository.findById(techUserId)
+                        .orElseThrow(() -> new ResourceNotFoundException("User", "id", techUserId));
+                Technician newTech = Technician.builder()
+                        .user(user)
+                        .name(user.getName())
+                        .phone(user.getPhone())
+                        .email(user.getEmail())
+                        .status(TechnicianStatus.AVAILABLE)
+                        .build();
+                return technicianRepository.save(newTech);
+            });
+            job.setTechnician(tech);
+        }
 
         JobStatus newStatus;
         try {
@@ -112,7 +172,6 @@ public class TechnicianService {
             order.setStatus(OrderStatus.INSTALLATION_IN_PROGRESS);
         } else if (newStatus == JobStatus.COMPLETED) {
             order.setStatus(OrderStatus.INSTALLATION_COMPLETED);
-            // Mark overall order as completed
             order.setStatus(OrderStatus.COMPLETED);
         }
         orderRepository.save(order);

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { cartService } from '../../services/cartService';
+import { getImageUrl, handleImageError } from '../../services/api';
 import { Cart } from '../../types';
 import { ShoppingCart, Trash2, Plus, Minus, Loader2, Package, ArrowRight, AlertCircle } from 'lucide-react';
 
@@ -13,10 +14,11 @@ const CartPage: React.FC = () => {
 
   const fetchCart = async () => {
     try {
+      setError('');
       const data = await cartService.getCart();
       setCart(data);
-    } catch (e) {
-      setError('Failed to load cart.');
+    } catch (e: any) {
+      setError(e?.response?.data?.message || 'Failed to load cart.');
     } finally {
       setLoading(false);
     }
@@ -25,13 +27,17 @@ const CartPage: React.FC = () => {
   useEffect(() => { fetchCart(); }, []);
 
   const handleUpdate = async (itemId: string, quantity: number) => {
-    if (quantity < 1) return;
+    if (quantity < 1) {
+      handleRemove(itemId);
+      return;
+    }
     setUpdating(itemId);
+    setError('');
     try {
       const updated = await cartService.updateCartItem(itemId, quantity);
       setCart(updated);
-    } catch (e) {
-      setError('Failed to update quantity.');
+    } catch (e: any) {
+      setError(e?.response?.data?.message || 'Failed to update quantity.');
     } finally {
       setUpdating(null);
     }
@@ -39,11 +45,12 @@ const CartPage: React.FC = () => {
 
   const handleRemove = async (itemId: string) => {
     setUpdating(itemId);
+    setError('');
     try {
       const updated = await cartService.removeCartItem(itemId);
       setCart(updated);
-    } catch (e) {
-      setError('Failed to remove item.');
+    } catch (e: any) {
+      setError(e?.response?.data?.message || 'Failed to remove item.');
     } finally {
       setUpdating(null);
     }
@@ -51,11 +58,12 @@ const CartPage: React.FC = () => {
 
   const handleClearCart = async () => {
     if (!confirm('Clear all items from cart?')) return;
+    setError('');
     try {
       await cartService.clearCart();
       setCart(prev => prev ? { ...prev, items: [], subtotal: 0, totalItems: 0 } : null);
-    } catch (e) {
-      setError('Failed to clear cart.');
+    } catch (e: any) {
+      setError(e?.response?.data?.message || 'Failed to clear cart.');
     }
   };
 
@@ -112,7 +120,7 @@ const CartPage: React.FC = () => {
             <div key={item.id} className="bg-slate-800 border border-slate-700 rounded-xl p-4 flex gap-4">
               <div className="w-16 h-16 bg-slate-700 rounded-lg flex-shrink-0 flex items-center justify-center">
                 {item.product.imageUrl ? (
-                  <img src={item.product.imageUrl} alt={item.product.name} className="w-full h-full object-cover rounded-lg" />
+                  <img src={getImageUrl(item.product.imageUrl)} alt={item.product.name} onError={handleImageError} className="w-full h-full object-cover rounded-lg" />
                 ) : (
                   <Package className="w-7 h-7 text-slate-500" />
                 )}
@@ -139,8 +147,8 @@ const CartPage: React.FC = () => {
                   </span>
                   <button
                     onClick={() => handleUpdate(item.id, item.quantity + 1)}
-                    disabled={updating === item.id}
-                    className="w-7 h-7 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300 disabled:opacity-50 transition-all">
+                    disabled={updating === item.id || item.quantity >= item.product.availableQuantity}
+                    className="w-7 h-7 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
                     <Plus className="w-3 h-3" />
                   </button>
                   <button onClick={() => handleRemove(item.id)} disabled={updating === item.id}

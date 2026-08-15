@@ -36,9 +36,9 @@ public class AuthController {
     }
 
     @PostMapping("/resend-otp")
-    public ResponseEntity<ApiResponse<String>> resendOtp(@RequestParam String emailOrPhone) {
-        String code = authService.resendOtp(emailOrPhone);
-        return ResponseEntity.ok(ApiResponse.success(code, "OTP code resent successfully"));
+    public ResponseEntity<ApiResponse<Void>> resendOtp(@RequestParam String emailOrPhone) {
+        authService.resendOtp(emailOrPhone);
+        return ResponseEntity.ok(ApiResponse.success(null, "OTP code resent successfully"));
     }
 
     @PostMapping("/change-password")

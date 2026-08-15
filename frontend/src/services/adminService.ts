@@ -70,9 +70,30 @@ export const adminService = {
     return res.data.data;
   },
 
+  // Get ALL categories for admin (including inactive)
+  async getAllCategoriesAdmin(): Promise<Category[]> {
+    try {
+      const res = await api.get<ApiResponse<Category[]>>('/admin/categories/all');
+      return res.data.data;
+    } catch {
+      // Fallback to public endpoint if admin endpoint not available
+      const res = await api.get<ApiResponse<Category[]>>('/categories');
+      return res.data.data;
+    }
+  },
+
   async createCategory(data: any): Promise<Category> {
     const res = await api.post<ApiResponse<Category>>('/admin/categories', data);
     return res.data.data;
+  },
+
+  async updateCategory(id: string, data: any): Promise<Category> {
+    const res = await api.put<ApiResponse<Category>>(`/admin/categories/${id}`, data);
+    return res.data.data;
+  },
+
+  async deleteCategory(id: string): Promise<void> {
+    await api.delete(`/admin/categories/${id}`);
   },
 
   // Vehicle Models

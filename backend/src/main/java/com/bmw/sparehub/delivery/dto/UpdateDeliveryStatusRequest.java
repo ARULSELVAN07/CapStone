@@ -8,4 +8,8 @@ public class UpdateDeliveryStatusRequest {
 
     @NotBlank(message = "Delivery status is required")
     private String status; // ASSIGNED, OUT_FOR_DELIVERY, DELIVERED, FAILED
+
+    private String deliveryNotes;
+    private String proofOfDeliveryOtp;
+    private String failureReason;
 }

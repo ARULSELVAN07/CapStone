@@ -32,9 +32,10 @@ public class DeliveryService {
     private final OrderRepository orderRepository;
     private final OrderService orderService;
     private final AuditLogService auditLogService;
+    private final com.bmw.sparehub.user.repository.UserRepository userRepository;
 
     public PageResponse<DeliveryDto> getAssignedDeliveriesForExecutive(UUID deUserId, Pageable pageable) {
-        Page<Delivery> page = deliveryRepository.findByDeliveryExecutiveUserIdOrderByCreatedAtDesc(deUserId, pageable);
+        Page<Delivery> page = deliveryRepository.findByDeliveryExecutiveUserIdOrDeliveryExecutiveUserIsNullOrderByCreatedAtDesc(deUserId, pageable);
         List<DeliveryDto> mapped = page.getContent().stream()
                 .map(this::mapToDto)
                 .toList();
@@ -45,24 +46,57 @@ public class DeliveryService {
         Delivery delivery = deliveryRepository.findById(deliveryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery", "id", deliveryId));
 
-        if (delivery.getDeliveryExecutiveUser() != null 
-                && !delivery.getDeliveryExecutiveUser().getId().equals(deUserId)) {
-            throw new BadRequestException("This delivery is assigned to another delivery executive");
+        return mapToDto(delivery);
+    }
+
+    @Transactional
+    public DeliveryDto claimDelivery(UUID deliveryId, UUID deUserId) {
+        Delivery delivery = deliveryRepository.findById(deliveryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery", "id", deliveryId));
+
+        com.bmw.sparehub.user.entity.User deUser = userRepository.findById(deUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", deUserId));
+
+        delivery.setDeliveryExecutiveUser(deUser);
+        delivery.setAssignedPersonName(deUser.getName());
+        delivery.setAssignedPersonPhone(deUser.getPhone());
+        if (delivery.getDeliveryStatus() == DeliveryStatus.PENDING) {
+            delivery.setDeliveryStatus(DeliveryStatus.ASSIGNED);
         }
+        deliveryRepository.save(delivery);
+
+        Order order = delivery.getOrder();
+        if (order.getStatus() == OrderStatus.PENDING || order.getStatus() == OrderStatus.CONFIRMED || order.getStatus() == OrderStatus.PACKED) {
+            order.setStatus(OrderStatus.OUT_FOR_DELIVERY);
+            orderRepository.save(order);
+        }
+
+        auditLogService.logAction(deUserId, "DELIVERY_CLAIMED", "DELIVERY", deliveryId.toString(),
+                "Delivery Executive " + deUser.getName() + " claimed delivery task");
 
         return mapToDto(delivery);
     }
 
     @Transactional
-    public DeliveryDto updateDeliveryStatus(UUID deliveryId, String statusStr, UUID deUserId) {
+    public DeliveryDto updateDeliveryStatus(UUID deliveryId, com.bmw.sparehub.delivery.dto.UpdateDeliveryStatusRequest request, UUID deUserId) {
         Delivery delivery = deliveryRepository.findById(deliveryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery", "id", deliveryId));
 
+        // Auto-assign if not assigned yet
+        if (delivery.getDeliveryExecutiveUser() == null) {
+            com.bmw.sparehub.user.entity.User deUser = userRepository.findById(deUserId).orElse(null);
+            if (deUser != null) {
+                delivery.setDeliveryExecutiveUser(deUser);
+                delivery.setAssignedPersonName(deUser.getName());
+                delivery.setAssignedPersonPhone(deUser.getPhone());
+            }
+        }
+
         DeliveryStatus newStatus;
         try {
-            newStatus = DeliveryStatus.valueOf(statusStr);
+            newStatus = DeliveryStatus.valueOf(request.getStatus());
         } catch (Exception e) {
-            throw new BadRequestException("Invalid delivery status: " + statusStr);
+            throw new BadRequestException("Invalid delivery status: " + request.getStatus());
         }
 
         delivery.setDeliveryStatus(newStatus);
@@ -78,13 +112,19 @@ public class DeliveryService {
             order.setStatus(OrderStatus.OUT_FOR_DELIVERY);
         } else if (newStatus == DeliveryStatus.DELIVERED) {
             order.setStatus(OrderStatus.DELIVERED);
-            // Mark as overall completed
             order.setStatus(OrderStatus.COMPLETED);
+        } else if (newStatus == DeliveryStatus.FAILED) {
+            order.setStatus(OrderStatus.CONFIRMED);
         }
         orderRepository.save(order);
 
+        String notes = request.getDeliveryNotes() != null ? request.getDeliveryNotes() : "";
+        if (request.getFailureReason() != null && !request.getFailureReason().isBlank()) {
+            notes += " (Failure reason: " + request.getFailureReason() + ")";
+        }
+
         auditLogService.logAction(deUserId, "DELIVERY_STATUS_UPDATED", "DELIVERY", deliveryId.toString(),
-                "Updated delivery status to " + newStatus);
+                "Updated delivery status to " + newStatus + (notes.isEmpty() ? "" : ". " + notes));
 
         log.info("Delivery Executive {} updated delivery {} status to {}", deUserId, deliveryId, newStatus);
         return mapToDto(delivery);

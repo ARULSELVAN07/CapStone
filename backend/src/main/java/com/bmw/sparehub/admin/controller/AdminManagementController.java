@@ -38,7 +38,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
+import java.nio.file.*;
+import java.io.IOException;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
@@ -51,6 +54,8 @@ import java.util.UUID;
 @PreAuthorize("hasRole('ADMIN')")
 @RequiredArgsConstructor
 public class AdminManagementController {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AdminManagementController.class);
 
     private final ProductService productService;
     private final InventoryService inventoryService;
@@ -95,6 +100,59 @@ public class AdminManagementController {
     ) {
         ProductDto product = productService.createProduct(request, userPrincipal.getId());
         return ResponseEntity.ok(ApiResponse.success(product, "Product created successfully"));
+    }
+
+    @PostMapping("/products/upload")
+    public ResponseEntity<ApiResponse<Map<String, String>>> uploadProductImage(
+            @RequestParam("file") MultipartFile file
+    ) {
+        if (file.isEmpty()) {
+            throw new com.bmw.sparehub.exception.BadRequestException("Please select a file to upload.");
+        }
+
+        // Validate content type
+        String contentType = file.getContentType();
+        if (contentType == null || (!contentType.equals("image/jpeg") && 
+                                    !contentType.equals("image/png") && 
+                                    !contentType.equals("image/webp"))) {
+            throw new com.bmw.sparehub.exception.BadRequestException("Please select a valid image file (JPG, PNG, or WEBP).");
+        }
+
+        // Validate file size (5MB limit)
+        long maxSizeBytes = 5 * 1024 * 1024;
+        if (file.getSize() > maxSizeBytes) {
+            throw new com.bmw.sparehub.exception.BadRequestException("File size exceeds the limit of 5MB.");
+        }
+
+        try {
+            // Ensure directory exists
+            Path uploadDir = Paths.get("uploads");
+            if (!Files.exists(uploadDir)) {
+                Files.createDirectories(uploadDir);
+            }
+
+            // Generate unique name
+            String originalFilename = file.getOriginalFilename();
+            String extension = "";
+            if (originalFilename != null && originalFilename.contains(".")) {
+                extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+            }
+            String newFilename = UUID.randomUUID().toString() + extension;
+            Path filePath = uploadDir.resolve(newFilename);
+
+            // Save file
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            // Construct response path
+            String fileUrl = "/uploads/" + newFilename;
+            Map<String, String> responseData = new HashMap<>();
+            responseData.put("imageUrl", fileUrl);
+
+            return ResponseEntity.ok(ApiResponse.success(responseData, "Image uploaded successfully"));
+        } catch (IOException e) {
+            log.error("Failed to store uploaded file", e);
+            throw new com.bmw.sparehub.exception.BadRequestException("Unable to upload image.");
+        }
     }
 
     @PutMapping("/products/{id}")
@@ -195,7 +253,7 @@ public class AdminManagementController {
             @PathVariable UUID id,
             @Valid @RequestBody UpdateOrderStatusRequest request
     ) {
-        OrderDto order = orderService.updateOrderStatus(id, request.getStatus(), userPrincipal.getId());
+        OrderDto order = orderService.updateOrderStatus(id, request.getStatus(), request.getNotes(), userPrincipal.getId());
         return ResponseEntity.ok(ApiResponse.success(order, "Order status updated successfully"));
     }
 

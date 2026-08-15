@@ -24,6 +24,10 @@ public interface InstallationJobRepository extends JpaRepository<InstallationJob
 
     Page<InstallationJob> findByTechnicianUserIdOrderByCreatedAtDesc(UUID technicianUserId, Pageable pageable);
 
+    Page<InstallationJob> findByTechnicianUserIdOrTechnicianIsNullOrderByCreatedAtDesc(UUID technicianUserId, Pageable pageable);
+
+    Page<InstallationJob> findByTechnicianIsNullOrderByCreatedAtDesc(Pageable pageable);
+
     List<InstallationJob> findByStatus(JobStatus status);
 
     long countByStatus(JobStatus status);

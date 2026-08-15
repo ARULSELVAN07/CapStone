@@ -66,6 +66,15 @@ export const DeliveryOrders: React.FC = () => {
     }
   };
 
+  const handleClaimDelivery = async (deliveryId: string) => {
+    try {
+      await deliveryService.claimDelivery(deliveryId);
+      fetchDeliveries();
+    } catch (err: any) {
+      alert(err?.response?.data?.message || 'Failed to claim delivery');
+    }
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div>
@@ -103,12 +112,22 @@ export const DeliveryOrders: React.FC = () => {
                   <h3 className="text-lg font-bold text-white mt-1">Order #{d.order?.orderNumber || 'SP-ORD-02'}</h3>
                 </div>
 
-                <button
-                  onClick={() => handleOpenModal(d)}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow"
-                >
-                  Update Delivery Status
-                </button>
+                <div className="flex items-center gap-2">
+                  {(!d.assignedPersonName || d.deliveryStatus === 'PENDING') && (
+                    <button
+                      onClick={() => handleClaimDelivery(d.id)}
+                      className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all shadow"
+                    >
+                      Claim Task
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleOpenModal(d)}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow"
+                  >
+                    Update Delivery Status
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-slate-300">

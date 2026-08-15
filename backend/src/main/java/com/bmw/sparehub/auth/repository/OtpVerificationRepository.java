@@ -12,7 +12,7 @@ import java.util.UUID;
 @Repository
 public interface OtpVerificationRepository extends JpaRepository<OtpVerification, UUID> {
 
-    @Query("SELECT o FROM OtpVerification o WHERE o.emailOrPhone = :emailOrPhone AND o.purpose = :purpose AND o.used = false ORDER BY o.createdAt DESC")
+    @Query("SELECT o FROM OtpVerification o WHERE o.emailOrPhone = :emailOrPhone AND o.purpose = :purpose AND o.used = false ORDER BY o.createdAt DESC LIMIT 1")
     Optional<OtpVerification> findFirstByEmailOrPhoneAndPurposeAndUsedFalseOrderByCreatedAtDesc(
             @Param("emailOrPhone") String emailOrPhone,
             @Param("purpose") String purpose);

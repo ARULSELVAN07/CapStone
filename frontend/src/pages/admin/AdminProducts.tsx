@@ -1,15 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import adminService from '../../services/adminService';
 import productService from '../../services/productService';
-import { Category, Product } from '../../types';
-import { Package, Plus, Search, Filter, Edit2, Trash2, CheckCircle, XCircle, AlertCircle, RefreshCw, Layers } from 'lucide-react';
+import api, { getImageUrl, handleImageError } from '../../services/api';
+import { Category, Product, VehicleModel } from '../../types';
+import { Package, Plus, Search, Filter, Edit2, Trash2, CheckCircle, XCircle, AlertCircle, RefreshCw, Layers, Upload } from 'lucide-react';
 
 export const AdminProducts: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [vehicleModels, setVehicleModels] = useState<VehicleModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+
+  // Image Upload State
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -24,15 +30,55 @@ export const AdminProducts: React.FC = () => {
     warrantyMonths: '24',
     imageUrl: '',
     initialStockQuantity: '10',
-    minimumStockThreshold: '5'
+    minimumStockThreshold: '5',
+    rating: '4.5',
+    compatibleVehicleModelIds: [] as string[]
   });
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    adminService.getVehicleModels().then(setVehicleModels).catch(console.error);
+  }, []);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setUploadError('Please select a valid image file (JPG, PNG, or WEBP).');
+      return;
+    }
+
+    const maxBytes = 5 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setUploadError('File size exceeds the limit of 5MB.');
+      return;
+    }
+
+    setUploadError('');
+    setUploading(true);
+
+    const data = new FormData();
+    data.append('file', file);
+
+    try {
+      const res = await api.post('/admin/products/upload', data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setFormData(prev => ({ ...prev, imageUrl: res.data.data.imageUrl }));
+    } catch (err: any) {
+      setUploadError(err.response?.data?.message || 'Unable to upload image.');
+    } finally {
+      setUploading(false);
+    }
+  };
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const cats = await adminService.getCategories();
+      const cats = await adminService.getAllCategoriesAdmin();
       setCategories(cats);
 
       const res = await productService.getProducts({
@@ -52,10 +98,20 @@ export const AdminProducts: React.FC = () => {
     fetchProducts();
   }, [search, selectedCategory]);
 
-  const handleOpenAddModal = () => {
+  const handleOpenAddModal = async () => {
     setEditingProduct(null);
+    let cats = categories;
+    if (cats.length === 0) {
+      try {
+        cats = await adminService.getAllCategoriesAdmin();
+        setCategories(cats);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    const activeCats = cats.filter(c => c.active !== false);
     setFormData({
-      categoryId: categories[0]?.id || '',
+      categoryId: activeCats[0]?.id || cats[0]?.id || '',
       partNumber: '',
       name: '',
       description: '',
@@ -64,8 +120,11 @@ export const AdminProducts: React.FC = () => {
       warrantyMonths: '24',
       imageUrl: '',
       initialStockQuantity: '10',
-      minimumStockThreshold: '5'
+      minimumStockThreshold: '5',
+      rating: '4.5',
+      compatibleVehicleModelIds: []
     });
+    setUploadError('');
     setMsg(null);
     setShowModal(true);
   };
@@ -73,17 +132,20 @@ export const AdminProducts: React.FC = () => {
   const handleOpenEditModal = (p: Product) => {
     setEditingProduct(p);
     setFormData({
-      categoryId: p.category?.id || '',
+      categoryId: p.category?.id || categories[0]?.id || '',
       partNumber: p.partNumber,
       name: p.name,
       description: p.description || '',
       brand: p.brand || 'BMW OEM',
-      price: p.price.toString(),
+      price: p.price?.toString() || '',
       warrantyMonths: p.warrantyMonths?.toString() || '24',
       imageUrl: p.imageUrl || '',
       initialStockQuantity: p.availableQuantity?.toString() || '10',
-      minimumStockThreshold: '5'
+      minimumStockThreshold: '5',
+      rating: (p.rating || 4.5).toString(),
+      compatibleVehicleModelIds: (p.compatibleModels || []).map(m => m.id)
     });
+    setUploadError('');
     setMsg(null);
     setShowModal(true);
   };
@@ -93,17 +155,44 @@ export const AdminProducts: React.FC = () => {
     setSubmitting(true);
     setMsg(null);
 
+    if (!formData.categoryId) {
+      setMsg({ type: 'error', text: 'Please select a Category for this spare part.' });
+      setSubmitting(false);
+      return;
+    }
+
+    if (!formData.partNumber.trim()) {
+      setMsg({ type: 'error', text: 'OEM Part Number is required.' });
+      setSubmitting(false);
+      return;
+    }
+
+    if (!formData.name.trim()) {
+      setMsg({ type: 'error', text: 'Product Title is required.' });
+      setSubmitting(false);
+      return;
+    }
+
+    const priceNum = parseFloat(formData.price);
+    if (isNaN(priceNum) || priceNum < 0) {
+      setMsg({ type: 'error', text: 'Please enter a valid price (non-negative number).' });
+      setSubmitting(false);
+      return;
+    }
+
     const payload = {
       categoryId: formData.categoryId,
-      partNumber: formData.partNumber,
-      name: formData.name,
-      description: formData.description,
-      brand: formData.brand,
-      price: parseFloat(formData.price),
-      warrantyMonths: parseInt(formData.warrantyMonths),
-      imageUrl: formData.imageUrl,
-      initialStock: parseInt(formData.initialStockQuantity),
-      minimumStockThreshold: parseInt(formData.minimumStockThreshold)
+      partNumber: formData.partNumber.trim(),
+      name: formData.name.trim(),
+      description: formData.description.trim(),
+      brand: formData.brand.trim() || 'BMW OEM',
+      price: priceNum,
+      warrantyMonths: parseInt(formData.warrantyMonths) || 12,
+      imageUrl: formData.imageUrl || null,
+      initialStock: parseInt(formData.initialStockQuantity) || 10,
+      minimumStockThreshold: parseInt(formData.minimumStockThreshold) || 5,
+      rating: parseFloat(formData.rating || '4.5'),
+      compatibleVehicleModelIds: formData.compatibleVehicleModelIds
     };
 
     try {
@@ -224,8 +313,9 @@ export const AdminProducts: React.FC = () => {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <img
-                          src={p.imageUrl || 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=150&q=80'}
+                          src={getImageUrl(p.imageUrl)}
                           alt={p.name}
+                          onError={handleImageError}
                           className="w-10 h-10 rounded-lg object-cover bg-slate-900 border border-slate-700"
                         />
                         <div>
@@ -357,7 +447,7 @@ export const AdminProducts: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-300 mb-1">Brand</label>
                   <input
@@ -392,17 +482,97 @@ export const AdminProducts: React.FC = () => {
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Rating (0.0 - 5.0)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.0"
+                    max="5.0"
+                    required
+                    placeholder="4.5"
+                    value={formData.rating}
+                    onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Image URL</label>
-                <input
-                  type="url"
-                  placeholder="https://example.com/image.jpg"
-                  value={formData.imageUrl}
-                  onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500"
-                />
+                <label className="block text-xs font-medium text-slate-300 mb-2">Product Image</label>
+                
+                {formData.imageUrl && (
+                  <div className="mb-3 relative w-32 h-32 rounded-lg overflow-hidden border border-slate-700 bg-slate-900 group">
+                    <img 
+                      src={getImageUrl(formData.imageUrl)} 
+                      alt="Preview" 
+                      onError={handleImageError}
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, imageUrl: '' })}
+                      className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-rose-400 text-xs font-semibold transition-opacity"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+
+                {!formData.imageUrl && (
+                  <div className="relative border-2 border-dashed border-slate-700 hover:border-red-500 rounded-lg p-6 text-center bg-slate-900 transition-all cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handleImageUpload}
+                      disabled={uploading}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      {uploading ? (
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-500" />
+                      ) : (
+                        <Upload className="w-6 h-6 text-slate-400" />
+                      )}
+                      <p className="text-sm text-slate-300 font-medium">
+                        {uploading ? 'Uploading image...' : 'Click to select / upload image'}
+                      </p>
+                      <p className="text-xs text-slate-500">JPG, PNG, or WEBP (Max 5MB)</p>
+                    </div>
+                  </div>
+                )}
+
+                {uploadError && (
+                  <p className="text-xs text-rose-400 mt-1 flex items-center gap-1">
+                    <span>⚠️</span> {uploadError}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-2">Compatible BMW Models</label>
+                <div className="bg-slate-900 border border-slate-700 rounded-lg p-3 max-h-32 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {vehicleModels.map(model => (
+                    <label key={model.id} className="flex items-center gap-2 text-sm text-slate-300 hover:text-white cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={formData.compatibleVehicleModelIds.includes(model.id)}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setFormData(prev => ({
+                            ...prev,
+                            compatibleVehicleModelIds: checked
+                              ? [...prev.compatibleVehicleModelIds, model.id]
+                              : prev.compatibleVehicleModelIds.filter(id => id !== model.id)
+                          }));
+                        }}
+                        className="rounded bg-slate-800 border-slate-700 text-red-600 focus:ring-red-500/20 focus:ring-offset-slate-900"
+                      />
+                      <span>{model.modelName} ({model.modelYear})</span>
+                    </label>
+                  ))}
+                </div>
               </div>
 
               {!editingProduct && (

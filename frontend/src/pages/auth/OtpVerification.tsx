@@ -103,11 +103,11 @@ const OtpVerification: React.FC = () => {
         </div>
 
         <div className="bg-slate-800 rounded-2xl border border-slate-700 p-8">
-          {/* Dev Hint */}
-          <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-lg px-4 py-3 mb-6">
-            <span className="text-amber-400 text-xs mt-0.5">💡</span>
-            <p className="text-xs text-amber-400">
-              <strong>Dev Mode:</strong> Use OTP <code className="bg-amber-500/20 px-1 rounded">123456</code> for instant verification.
+          {/* OTP Warning Info */}
+          <div className="flex items-start gap-2 bg-blue-500/10 border border-blue-500/20 rounded-lg px-4 py-3 mb-6">
+            <span className="text-blue-400 text-xs mt-0.5">ℹ️</span>
+            <p className="text-xs text-blue-400">
+              Please enter the OTP sent to your registered email. Check the application logs or console to retrieve your code.
             </p>
           </div>
 

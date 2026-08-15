@@ -47,10 +47,13 @@ const AdminOrders: React.FC = () => {
   const [scheduledSlot, setScheduledSlot] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => { fetchOrders(); }, [page, statusFilter]);
+  const [searchInput, setSearchInput] = useState('');
+
+  useEffect(() => { fetchOrders(); }, [page, statusFilter, search]);
 
   const fetchOrders = async () => {
     setLoading(true);
+    setError('');
     try {
       const params: any = { page, size: 15 };
       if (statusFilter) params.status = statusFilter;
@@ -163,10 +166,16 @@ const AdminOrders: React.FC = () => {
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && fetchOrders()}
-            placeholder="Search by order #, customer..."
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all" />
+          <input type="text" value={searchInput} onChange={e => setSearchInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { setSearch(searchInput); setPage(0); } }}
+            placeholder="Search by order #, customer... (press Enter)"
+            className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-24 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all" />
+          <button
+            onClick={() => { setSearch(searchInput); setPage(0); }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1 bg-red-600 hover:bg-red-500 text-white text-xs rounded-md transition-all"
+          >
+            Search
+          </button>
         </div>
         <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(0); }}
           className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-all">

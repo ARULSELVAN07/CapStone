@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../store/AuthContext';
 import authService from '../../services/authService';
 import { User, Phone, Mail, Shield, Key, Save, AlertCircle, CheckCircle2, Car } from 'lucide-react';
@@ -17,13 +17,27 @@ export const CustomerProfile: React.FC = () => {
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPass, setSavingPass] = useState(false);
 
+  useEffect(() => {
+    let mounted = true;
+    authService.getProfile().then(profile => {
+      if (profile && mounted) {
+        setName(profile.name || '');
+        setPhone(profile.phone || '');
+        updateUser(profile);
+      }
+    }).catch(console.error);
+    return () => { mounted = false; };
+  }, [updateUser]);
+
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setProfileMsg(null);
     setSavingProfile(true);
     try {
-      const updated = await authService.updateProfile(name, phone);
+      const updated = await authService.updateProfile(name.trim(), phone.trim() || undefined);
       updateUser(updated);
+      setName(updated.name);
+      setPhone(updated.phone || '');
       setProfileMsg({ type: 'success', text: 'Profile updated successfully!' });
     } catch (err: any) {
       setProfileMsg({ type: 'error', text: err.response?.data?.message || 'Failed to update profile' });

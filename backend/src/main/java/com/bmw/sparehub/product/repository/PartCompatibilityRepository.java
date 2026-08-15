@@ -20,4 +20,6 @@ public interface PartCompatibilityRepository extends JpaRepository<PartCompatibi
     boolean existsByProductIdAndVehicleModelId(UUID productId, UUID vehicleModelId);
 
     void deleteByProductIdAndVehicleModelId(UUID productId, UUID vehicleModelId);
+
+    void deleteByProductId(UUID productId);
 }

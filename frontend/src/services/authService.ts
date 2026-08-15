@@ -17,9 +17,8 @@ export const authService = {
     return res.data.data;
   },
 
-  async resendOtp(emailOrPhone: string): Promise<string> {
-    const res = await api.post<ApiResponse<string>>(`/auth/resend-otp?emailOrPhone=${encodeURIComponent(emailOrPhone)}`);
-    return res.data.data;
+  async resendOtp(emailOrPhone: string): Promise<void> {
+    await api.post<ApiResponse<void>>(`/auth/resend-otp?emailOrPhone=${encodeURIComponent(emailOrPhone)}`);
   },
 
   async getProfile(): Promise<UserProfile> {

@@ -22,6 +22,10 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
 
     Page<Delivery> findByDeliveryExecutiveUserIdOrderByCreatedAtDesc(UUID deliveryExecutiveUserId, Pageable pageable);
 
+    Page<Delivery> findByDeliveryExecutiveUserIdOrDeliveryExecutiveUserIsNullOrderByCreatedAtDesc(UUID deliveryExecutiveUserId, Pageable pageable);
+
+    Page<Delivery> findByDeliveryExecutiveUserIsNullOrderByCreatedAtDesc(Pageable pageable);
+
     List<Delivery> findByDeliveryStatus(DeliveryStatus status);
 
     long countByDeliveryStatus(DeliveryStatus status);

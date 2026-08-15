@@ -59,6 +59,7 @@ export interface Product {
   price: number;
   warrantyMonths: number;
   imageUrl?: string;
+  rating?: number;
   status: 'ACTIVE' | 'INACTIVE';
   availableQuantity: number;
   stockStatus: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK';

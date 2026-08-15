@@ -51,6 +51,15 @@ public class DatabaseSeeder implements CommandLineRunner {
         } else {
             log.info("Database contains pre-seeded SQL users. Ensuring valid BCrypt password hashes...");
             updateUserPasswords();
+            // Also seed vehicle models if missing
+            seedVehicleModels();
+            // Re-seed categories and products if products table is empty
+            if (productRepository.count() == 0) {
+                log.info("Products table is empty — seeding categories and products programmatically...");
+                seedCategoriesAndProducts();
+            } else {
+                log.info("Products already seeded ({} products found).", productRepository.count());
+            }
         }
     }
 

@@ -47,11 +47,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = useCallback((response: AuthResponse) => {
     if (response.token) {
       localStorage.setItem('sparehub_token', response.token);
+      // Preserve any existing stored user data (e.g. phone) that isn't in the token
+      const existingUser = localStorage.getItem('sparehub_user');
+      let existingPhone = '';
+      try {
+        if (existingUser) {
+          const parsed = JSON.parse(existingUser);
+          if (parsed.email === response.email) {
+            existingPhone = parsed.phone || '';
+          }
+        }
+      } catch {}
       const userProfile: UserProfile = {
         id: response.userId,
         name: response.name,
         email: response.email,
-        phone: '',
+        phone: existingPhone,
         role: response.role,
         status: 'ACTIVE',
         employeeId: response.employeeId,

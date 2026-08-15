@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../store/AuthContext';
 import { productService } from '../../services/productService';
 import { cartService } from '../../services/cartService';
+import { getImageUrl, handleImageError } from '../../services/api';
 import { Category, Product, VehicleModel } from '../../types';
 import { vehicleService } from '../../services/vehicleService';
 import {
@@ -20,6 +21,19 @@ const SORT_OPTIONS = [
 const ProductCatalog: React.FC = () => {
   const { activeVehicle } = useAuth();
   const navigate = useNavigate();
+
+  const renderStars = (rating: number | undefined) => {
+    const r = rating || 0;
+    const filledStars = Math.round(r);
+    const starString = '★'.repeat(filledStars) + '☆'.repeat(5 - filledStars);
+    return (
+      <div className="flex items-center gap-1 text-amber-400 text-sm my-1">
+        <span className="tracking-wider">{starString}</span>
+        <span className="text-slate-400 text-xs font-semibold">{r.toFixed(1)}</span>
+      </div>
+    );
+  };
+
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [models, setModels] = useState<VehicleModel[]>([]);
@@ -212,7 +226,7 @@ const ProductCatalog: React.FC = () => {
               <Link to={`/customer/catalog/${product.id}`} className="block p-4 flex-1">
                 <div className="w-full aspect-square bg-slate-700 rounded-lg mb-3 flex items-center justify-center group-hover:bg-slate-600 transition-colors">
                   {product.imageUrl ? (
-                    <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover rounded-lg" />
+                    <img src={getImageUrl(product.imageUrl)} alt={product.name} onError={handleImageError} className="w-full h-full object-cover rounded-lg" />
                   ) : (
                     <Package className="w-10 h-10 text-slate-500" />
                   )}
@@ -222,10 +236,25 @@ const ProductCatalog: React.FC = () => {
                   <span className="text-xs text-slate-500 font-mono">{product.partNumber}</span>
                 </div>
                 <h3 className="text-white font-medium text-sm leading-tight mb-1 line-clamp-2">{product.name}</h3>
-                <p className="text-slate-400 text-xs mb-2">{product.brand}</p>
-                <p className="text-white font-bold text-lg">₹{product.price.toLocaleString('en-IN')}</p>
+                <p className="text-slate-400 text-xs mb-1">{product.brand}</p>
+                {renderStars(product.rating)}
+                
+                <div className="mt-2 mb-1">
+                  <span className={`text-xs font-semibold ${product.availableQuantity > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {product.availableQuantity > 0 ? `Available Stock: ${product.availableQuantity}` : 'Out of Stock'}
+                  </span>
+                </div>
+
+                <p className="text-white font-bold text-lg mt-1">₹{product.price.toLocaleString('en-IN')}</p>
+                
+                {product.description && (
+                  <p className="text-slate-400 text-xs mt-2 line-clamp-2 leading-relaxed">
+                    {product.description}
+                  </p>
+                )}
+
                 {product.warrantyMonths > 0 && (
-                  <p className="text-slate-500 text-xs mt-1">{product.warrantyMonths} months warranty</p>
+                  <p className="text-slate-500 text-xs mt-1.5">{product.warrantyMonths} months warranty</p>
                 )}
               </Link>
               <div className="px-4 pb-4">

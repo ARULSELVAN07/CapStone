@@ -46,6 +46,7 @@ public class SecurityConfig {
                 // Public auth & documentation
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                .requestMatchers("/uploads/**").permitAll()
                 
                 // Public product catalog & models reading
                 .requestMatchers(HttpMethod.GET, "/api/v1/products/**", "/api/v1/categories/**", "/api/v1/vehicle-models/**").permitAll()
@@ -56,9 +57,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/delivery/**").hasRole("DELIVERY_EXECUTIVE")
                 
                 // Customer & General User endpoints
-                .requestMatchers("/api/v1/cart/**", "/api/v1/vehicles/**").hasAnyRole("CUSTOMER", "ADMIN")
-                .requestMatchers(HttpMethod.POST, "/api/v1/orders/**").hasRole("CUSTOMER")
-                .requestMatchers(HttpMethod.GET, "/api/v1/orders/**").hasAnyRole("CUSTOMER", "ADMIN")
+                .requestMatchers("/api/v1/cart/**", "/api/v1/vehicles/**").authenticated()
+                .requestMatchers(HttpMethod.POST, "/api/v1/orders/**").hasAnyRole("CUSTOMER", "ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/v1/orders/**").authenticated()
+                .requestMatchers(HttpMethod.PUT, "/api/v1/orders/**").hasAnyRole("CUSTOMER", "ADMIN")
                 .requestMatchers("/api/v1/users/**").authenticated()
                 
                 .anyRequest().authenticated()

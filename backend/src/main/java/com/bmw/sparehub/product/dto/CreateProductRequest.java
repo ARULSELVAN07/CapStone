@@ -33,6 +33,8 @@ public class CreateProductRequest {
 
     private String imageUrl;
 
+    private Double rating;
+
     private String status; // ACTIVE, INACTIVE
 
     private Integer initialStock;

@@ -22,7 +22,10 @@ const CustomerLogin: React.FC = () => {
         navigate('/verify-otp', { state: { emailOrPhone: form.identifier } });
       } else {
         login(res);
-        navigate('/customer');
+        if (res.role === 'ADMIN') navigate('/admin');
+        else if (res.role === 'TECHNICIAN') navigate('/technician');
+        else if (res.role === 'DELIVERY_EXECUTIVE') navigate('/delivery');
+        else navigate('/customer');
       }
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Invalid credentials. Please try again.');

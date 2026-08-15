@@ -79,7 +79,7 @@ const AdminDashboard: React.FC = () => {
     { label: 'Total Orders', value: stats.totalOrders ?? 0, icon: ClipboardList, color: 'text-blue-400', bg: 'bg-blue-400/10', link: '/admin/orders' },
     { label: 'Pending Orders', value: stats.pendingOrders ?? 0, icon: ShoppingCart, color: 'text-amber-400', bg: 'bg-amber-400/10', link: '/admin/orders', description: 'Require action' },
     { label: 'Total Products', value: stats.totalProducts ?? 0, icon: Package, color: 'text-purple-400', bg: 'bg-purple-400/10', link: '/admin/products' },
-    { label: 'Low Stock Items', value: stats.lowStockItems ?? 0, icon: AlertTriangle, color: 'text-red-400', bg: 'bg-red-400/10', link: '/admin/low-stock', description: 'Need restocking' },
+    { label: 'Low Stock Items', value: (stats as any).lowStockProducts ?? stats.lowStockItems ?? 0, icon: AlertTriangle, color: 'text-red-400', bg: 'bg-red-400/10', link: '/admin/low-stock', description: 'Need restocking' },
     { label: 'Total Customers', value: stats.totalCustomers ?? 0, icon: Users, color: 'text-green-400', bg: 'bg-green-400/10', link: '/admin/users' },
     { label: 'Revenue', value: stats.totalRevenue ? `₹${(stats.totalRevenue / 1000).toFixed(0)}K` : '₹0', icon: TrendingUp, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
     { label: "Today's Orders", value: stats.todayOrders ?? 0, icon: Boxes, color: 'text-cyan-400', bg: 'bg-cyan-400/10', link: '/admin/orders' },

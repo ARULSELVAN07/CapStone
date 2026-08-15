@@ -22,6 +22,11 @@ export const deliveryService = {
     return res.data.data;
   },
 
+  async claimDelivery(deliveryId: string): Promise<any> {
+    const res = await api.put<ApiResponse<any>>(`/delivery/orders/${deliveryId}/claim`);
+    return res.data.data;
+  },
+
   async changePassword(oldPassword: string, newPassword: string, confirmNewPassword: string): Promise<void> {
     await api.post('/auth/change-password', { oldPassword, newPassword, confirmNewPassword });
   }

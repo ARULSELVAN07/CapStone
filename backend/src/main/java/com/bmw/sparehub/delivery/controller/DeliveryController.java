@@ -54,13 +54,22 @@ public class DeliveryController {
         return ResponseEntity.ok(ApiResponse.success(delivery));
     }
 
+    @PutMapping("/orders/{id}/claim")
+    public ResponseEntity<ApiResponse<DeliveryDto>> claimDelivery(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable UUID id
+    ) {
+        DeliveryDto claimed = deliveryService.claimDelivery(id, userPrincipal.getId());
+        return ResponseEntity.ok(ApiResponse.success(claimed, "Delivery task claimed successfully"));
+    }
+
     @PutMapping("/orders/{id}/status")
     public ResponseEntity<ApiResponse<DeliveryDto>> updateDeliveryStatus(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable UUID id,
             @Valid @RequestBody UpdateDeliveryStatusRequest request
     ) {
-        DeliveryDto updated = deliveryService.updateDeliveryStatus(id, request.getStatus(), userPrincipal.getId());
+        DeliveryDto updated = deliveryService.updateDeliveryStatus(id, request, userPrincipal.getId());
         return ResponseEntity.ok(ApiResponse.success(updated, "Delivery status updated successfully"));
     }
 }

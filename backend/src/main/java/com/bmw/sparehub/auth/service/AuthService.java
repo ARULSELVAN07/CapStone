@@ -135,23 +135,19 @@ public class AuthService {
 
         boolean isValid = false;
 
-        // 1. Check dev mode code fallback if enabled
-        if (devModeOtpEnabled && devModeOtpCode.equals(request.getOtpCode())) {
-            isValid = true;
-            log.info("OTP verified using Dev Mode fallback code for {}", request.getEmailOrPhone());
-        } else {
-            // 2. Check stored DB OTP
-            OtpVerification otpRecord = otpVerificationRepository
-                    .findFirstByEmailOrPhoneAndPurposeAndUsedFalseOrderByCreatedAtDesc(request.getEmailOrPhone(), "LOGIN")
-                    .orElse(null);
+        // Check stored DB OTP
+        OtpVerification otpRecord = otpVerificationRepository
+                .findFirstByEmailOrPhoneAndPurposeAndUsedFalseOrderByCreatedAtDesc(request.getEmailOrPhone(), "LOGIN")
+                .orElse(null);
 
-            if (otpRecord != null 
-                    && otpRecord.getOtpCode().equals(request.getOtpCode()) 
-                    && otpRecord.getExpiresAt().isAfter(LocalDateTime.now())) {
-                isValid = true;
-                otpRecord.setUsed(true);
-                otpVerificationRepository.save(otpRecord);
-            }
+        if (devModeOtpEnabled && devModeOtpCode != null && devModeOtpCode.equals(request.getOtpCode())) {
+            isValid = true;
+        } else if (otpRecord != null 
+                && otpRecord.getOtpCode().equals(request.getOtpCode()) 
+                && otpRecord.getExpiresAt().isAfter(LocalDateTime.now())) {
+            isValid = true;
+            otpRecord.setUsed(true);
+            otpVerificationRepository.save(otpRecord);
         }
 
         if (!isValid) {
@@ -179,11 +175,11 @@ public class AuthService {
     }
 
     @Transactional
-    public String resendOtp(String emailOrPhone) {
+    public void resendOtp(String emailOrPhone) {
         User user = userRepository.findByEmailOrEmployeeId(emailOrPhone, emailOrPhone)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        return generateAndSaveOtp(user.getEmail(), "LOGIN");
+        generateAndSaveOtp(user.getEmail(), "LOGIN");
     }
 
     @Transactional
@@ -215,23 +211,21 @@ public class AuthService {
     @Transactional
     public void resetPassword(ResetPasswordRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + request.getEmail()));
 
         boolean isValid = false;
-        if (devModeOtpEnabled && devModeOtpCode.equals(request.getOtpCode())) {
-            isValid = true;
-        } else {
-            OtpVerification otpRecord = otpVerificationRepository
-                    .findFirstByEmailOrPhoneAndPurposeAndUsedFalseOrderByCreatedAtDesc(request.getEmail(), "RESET_PASSWORD")
-                    .orElse(null);
+        OtpVerification otpRecord = otpVerificationRepository
+                .findFirstByEmailOrPhoneAndPurposeAndUsedFalseOrderByCreatedAtDesc(request.getEmail(), "RESET_PASSWORD")
+                .orElse(null);
 
-            if (otpRecord != null 
-                    && otpRecord.getOtpCode().equals(request.getOtpCode()) 
-                    && otpRecord.getExpiresAt().isAfter(LocalDateTime.now())) {
-                isValid = true;
-                otpRecord.setUsed(true);
-                otpVerificationRepository.save(otpRecord);
-            }
+        if (devModeOtpEnabled && devModeOtpCode != null && devModeOtpCode.equals(request.getOtpCode())) {
+            isValid = true;
+        } else if (otpRecord != null 
+                && otpRecord.getOtpCode().equals(request.getOtpCode()) 
+                && otpRecord.getExpiresAt().isAfter(LocalDateTime.now())) {
+            isValid = true;
+            otpRecord.setUsed(true);
+            otpVerificationRepository.save(otpRecord);
         }
 
         if (!isValid) {
@@ -244,13 +238,8 @@ public class AuthService {
     }
 
     private String generateAndSaveOtp(String emailOrPhone, String purpose) {
-        String otpCode;
-        if (devModeOtpEnabled) {
-            otpCode = devModeOtpCode;
-        } else {
-            SecureRandom random = new SecureRandom();
-            otpCode = String.format("%06d", random.nextInt(1000000));
-        }
+        SecureRandom random = new SecureRandom();
+        String otpCode = String.format("%06d", random.nextInt(1000000));
 
         OtpVerification verification = OtpVerification.builder()
                 .emailOrPhone(emailOrPhone)
@@ -262,6 +251,10 @@ public class AuthService {
 
         otpVerificationRepository.save(verification);
 
+        System.out.println("=================================================");
+        System.out.println("SPAREHUB DYNAMIC OTP: [" + otpCode + "] FOR EMAIL: " + emailOrPhone + " (PURPOSE: " + purpose + ")");
+        System.out.println("=================================================");
+
         // Attempt sending email via MailSender silently catch if SMTP unconfigured
         try {
             SimpleMailMessage message = new SimpleMailMessage();
@@ -271,7 +264,7 @@ public class AuthService {
                            "\nThis code expires in " + otpExpiryMinutes + " minutes.");
             mailSender.send(message);
         } catch (Exception e) {
-            log.warn("Could not send SMTP email to {}. Dev Mode OTP is active: {}", emailOrPhone, otpCode);
+            log.warn("Could not send SMTP email to {}. Dynamic OTP code is: {}", emailOrPhone, otpCode);
         }
 
         return otpCode;

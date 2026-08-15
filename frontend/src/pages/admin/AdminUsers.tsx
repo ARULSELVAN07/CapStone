@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import adminService from '../../services/adminService';
 import { UserProfile, UserRole } from '../../types';
-import { Users, Plus, Shield, CheckCircle2, XCircle, AlertCircle, Mail, Phone, Lock, UserCheck, UserX } from 'lucide-react';
+import { Users, Plus, Shield, CheckCircle2, XCircle, AlertCircle, RefreshCw, Search } from 'lucide-react';
 
 export const AdminUsers: React.FC = () => {
   const [activeTab, setActiveTab] = useState<UserRole>('CUSTOMER');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
   // Modal
   const [showModal, setShowModal] = useState(false);
@@ -32,6 +33,7 @@ export const AdminUsers: React.FC = () => {
       setUsers(data);
     } catch (e) {
       console.error(e);
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -47,7 +49,7 @@ export const AdminUsers: React.FC = () => {
       email: '',
       phone: '',
       password: '',
-      employeeId: role === 'TECHNICIAN' ? 'TECH-101' : role === 'DELIVERY_EXECUTIVE' ? 'DEL-201' : 'ADM-901',
+      employeeId: role === 'TECHNICIAN' ? 'TECH-' : role === 'DELIVERY_EXECUTIVE' ? 'DEL-' : 'ADM-',
       role: role
     });
     setMsg(null);
@@ -58,10 +60,36 @@ export const AdminUsers: React.FC = () => {
     e.preventDefault();
     setSubmitting(true);
     setMsg(null);
+
+    if (!formData.name.trim()) {
+      setMsg({ type: 'error', text: 'Full name is required.' });
+      setSubmitting(false);
+      return;
+    }
+    if (!formData.email.trim()) {
+      setMsg({ type: 'error', text: 'Email address is required.' });
+      setSubmitting(false);
+      return;
+    }
+    if (!formData.password || formData.password.length < 6) {
+      setMsg({ type: 'error', text: 'Password must be at least 6 characters.' });
+      setSubmitting(false);
+      return;
+    }
+
+    const payload = {
+      name: formData.name.trim(),
+      email: formData.email.trim(),
+      phone: formData.phone.trim(),
+      temporaryPassword: formData.password,
+      employeeId: formData.employeeId.trim(),
+      role: formData.role
+    };
+
     try {
-      if (formData.role === 'TECHNICIAN') await adminService.createTechnician(formData);
-      else if (formData.role === 'DELIVERY_EXECUTIVE') await adminService.createDeliveryExecutive(formData);
-      else if (formData.role === 'ADMIN') await adminService.createAdmin(formData);
+      if (formData.role === 'TECHNICIAN') await adminService.createTechnician(payload);
+      else if (formData.role === 'DELIVERY_EXECUTIVE') await adminService.createDeliveryExecutive(payload);
+      else if (formData.role === 'ADMIN') await adminService.createAdmin(payload);
 
       setMsg({ type: 'success', text: 'Account created successfully!' });
       setTimeout(() => {
@@ -69,7 +97,7 @@ export const AdminUsers: React.FC = () => {
         fetchUsers();
       }, 1000);
     } catch (err: any) {
-      setMsg({ type: 'error', text: err.response?.data?.message || 'Failed to create user account' });
+      setMsg({ type: 'error', text: err.response?.data?.message || 'Failed to create user account. Please check the details and try again.' });
     } finally {
       setSubmitting(false);
     }
@@ -77,13 +105,25 @@ export const AdminUsers: React.FC = () => {
 
   const handleToggleStatus = async (user: UserProfile) => {
     const newStatus = user.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE';
-    if (!window.confirm(`Are you sure you want to change ${user.name}'s status to ${newStatus}?`)) return;
+    if (!window.confirm(`Are you sure you want to ${newStatus === 'BLOCKED' ? 'block' : 'activate'} ${user.name}'s account?`)) return;
     try {
       await adminService.updateUserStatus(user.id, newStatus);
       fetchUsers();
-    } catch (e) {
-      alert('Failed to update status');
+    } catch (e: any) {
+      alert(e.response?.data?.message || 'Failed to update status');
     }
+  };
+
+  const filteredUsers = users.filter(u =>
+    !search ||
+    u.name?.toLowerCase().includes(search.toLowerCase()) ||
+    u.email?.toLowerCase().includes(search.toLowerCase()) ||
+    u.employeeId?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const getRoleLabel = (role: UserRole) => {
+    if (role === 'DELIVERY_EXECUTIVE') return 'DELIVERY EXECUTIVES';
+    return `${role}S`;
   };
 
   return (
@@ -111,16 +151,37 @@ export const AdminUsers: React.FC = () => {
         {(['CUSTOMER', 'TECHNICIAN', 'DELIVERY_EXECUTIVE', 'ADMIN'] as UserRole[]).map((role) => (
           <button
             key={role}
-            onClick={() => setActiveTab(role)}
+            onClick={() => { setActiveTab(role); setSearch(''); }}
             className={`px-4 py-3 text-sm font-semibold border-b-2 transition-all ${
               activeTab === role
                 ? 'border-red-500 text-red-400 bg-red-500/10'
                 : 'border-transparent text-slate-400 hover:text-white hover:border-slate-600'
             }`}
           >
-            {role === 'DELIVERY_EXECUTIVE' ? 'DELIVERY EXECUTIVES' : `${role}S`}
+            {getRoleLabel(role)}
           </button>
         ))}
+      </div>
+
+      {/* Search bar */}
+      <div className="relative">
+        <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+        <input
+          type="text"
+          placeholder={`Search ${activeTab.toLowerCase().replace('_', ' ')}s by name, email...`}
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:outline-none focus:border-red-500 placeholder-slate-500"
+        />
+        {loading ? null : (
+          <button
+            onClick={fetchUsers}
+            className="absolute right-3 top-2 p-1 text-slate-400 hover:text-white transition-colors"
+            title="Refresh"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Users Table */}
@@ -145,14 +206,14 @@ export const AdminUsers: React.FC = () => {
                     <p>Loading user records...</p>
                   </td>
                 </tr>
-              ) : users.length === 0 ? (
+              ) : filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
-                    No accounts found for role {activeTab}.
+                    {search ? `No ${activeTab.toLowerCase().replace('_', ' ')}s matching "${search}".` : `No accounts found for role ${activeTab}.`}
                   </td>
                 </tr>
               ) : (
-                users.map((u) => (
+                filteredUsers.map((u) => (
                   <tr key={u.id} className="hover:bg-slate-750/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -181,7 +242,7 @@ export const AdminUsers: React.FC = () => {
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-500/20 text-rose-400 rounded-full text-xs font-semibold border border-rose-500/30">
-                          <XCircle className="w-3.5 h-3.5" /> Blocked
+                          <XCircle className="w-3.5 h-3.5" /> {u.status === 'BLOCKED' ? 'Blocked' : 'Inactive'}
                         </span>
                       )}
                     </td>
@@ -203,6 +264,11 @@ export const AdminUsers: React.FC = () => {
             </tbody>
           </table>
         </div>
+        {!loading && filteredUsers.length > 0 && (
+          <div className="px-6 py-3 border-t border-slate-700 text-xs text-slate-500">
+            Showing {filteredUsers.length} of {users.length} {activeTab.toLowerCase().replace('_', ' ')}(s)
+          </div>
+        )}
       </div>
 
       {/* Modal */}
@@ -217,14 +283,14 @@ export const AdminUsers: React.FC = () => {
               <div className={`mb-4 p-3 rounded-lg flex items-center gap-2 text-sm ${
                 msg.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
               }`}>
-                {msg.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                {msg.type === 'success' ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
                 {msg.text}
               </div>
             )}
 
             <form onSubmit={handleCreateStaff} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Full Name</label>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Full Name *</label>
                 <input
                   type="text"
                   required
@@ -236,7 +302,7 @@ export const AdminUsers: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Email Address</label>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Email Address *</label>
                 <input
                   type="email"
                   required
@@ -249,7 +315,7 @@ export const AdminUsers: React.FC = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">Phone</label>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Phone *</label>
                   <input
                     type="tel"
                     required
@@ -261,7 +327,7 @@ export const AdminUsers: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">Employee ID</label>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Employee ID *</label>
                   <input
                     type="text"
                     required
@@ -273,7 +339,7 @@ export const AdminUsers: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Password</label>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Password * (min. 6 chars)</label>
                 <input
                   type="password"
                   required

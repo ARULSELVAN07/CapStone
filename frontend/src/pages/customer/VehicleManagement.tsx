@@ -32,11 +32,20 @@ const VehicleManagement: React.FC = () => {
       ]);
       setVehicles(vehiclesData);
       setModels(modelsData);
+      if (vehiclesData.length > 0 && (!activeVehicle || !vehiclesData.some(v => v.id === activeVehicle.id))) {
+        setActiveVehicle(vehiclesData[0]);
+      }
     } catch (e) {
       setError('Failed to load vehicles.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSetActive = (vehicle: Vehicle) => {
+    setActiveVehicle(vehicle);
+    setSuccess(`Set ${vehicle.vehicleModel.modelName} as your active BMW vehicle!`);
+    setTimeout(() => setSuccess(''), 3000);
   };
 
   const handleAddVehicle = async (e: React.FormEvent) => {
@@ -54,7 +63,7 @@ const VehicleManagement: React.FC = () => {
       setSuccess('Vehicle added successfully!');
       setShowModal(false);
       setForm({ vehicleModelId: '', vin: '', registrationNumber: '', purchaseYear: new Date().getFullYear() });
-      if (!activeVehicle) setActiveVehicle(newVehicle);
+      setActiveVehicle(newVehicle);
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to add vehicle.');
@@ -67,8 +76,13 @@ const VehicleManagement: React.FC = () => {
     if (!confirm('Remove this vehicle from your account?')) return;
     try {
       await vehicleService.deleteVehicle(id);
-      setVehicles(prev => prev.filter(v => v.id !== id));
-      if (activeVehicle?.id === id) setActiveVehicle(null);
+      const remaining = vehicles.filter(v => v.id !== id);
+      setVehicles(remaining);
+      if (activeVehicle?.id === id) {
+        setActiveVehicle(remaining.length > 0 ? remaining[0] : null);
+      }
+      setSuccess('Vehicle removed from your account.');
+      setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to remove vehicle.');
     }
@@ -160,7 +174,7 @@ const VehicleManagement: React.FC = () => {
 
               <div className="flex gap-2 mt-4">
                 {activeVehicle?.id !== vehicle.id && (
-                  <button onClick={() => setActiveVehicle(vehicle)}
+                  <button onClick={() => handleSetActive(vehicle)}
                     className="flex-1 text-sm bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 py-2 rounded-lg font-medium transition-all">
                     Set Active
                   </button>

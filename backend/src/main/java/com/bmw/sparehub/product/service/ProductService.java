@@ -53,6 +53,12 @@ public class ProductService {
                 .collect(Collectors.toList());
     }
 
+    public List<CategoryDto> getAllCategoriesAdmin() {
+        return categoryRepository.findAll().stream()
+                .map(this::mapCategoryToDto)
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public CategoryDto createCategory(CategoryDto request, UUID adminUserId) {
         if (categoryRepository.existsByName(request.getName())) {
@@ -72,6 +78,40 @@ public class ProductService {
         return mapCategoryToDto(category);
     }
 
+    @Transactional
+    public CategoryDto updateCategory(UUID id, CategoryDto request, UUID adminUserId) {
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category", "id", id));
+
+        if (!category.getName().equalsIgnoreCase(request.getName()) && categoryRepository.existsByName(request.getName())) {
+            throw new ConflictException("Category already exists with name: " + request.getName());
+        }
+
+        category.setName(request.getName());
+        category.setDescription(request.getDescription());
+        if (request.getActive() != null) {
+            category.setActive(request.getActive());
+        }
+
+        categoryRepository.save(category);
+        auditLogService.logAction(adminUserId, "CATEGORY_UPDATED", "CATEGORY", id.toString(),
+                "Updated category " + category.getName());
+
+        return mapCategoryToDto(category);
+    }
+
+    @Transactional
+    public void deleteCategory(UUID id, UUID adminUserId) {
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category", "id", id));
+
+        category.setActive(false);
+        categoryRepository.save(category);
+
+        auditLogService.logAction(adminUserId, "CATEGORY_DELETED", "CATEGORY", id.toString(),
+                "Deactivated category " + category.getName());
+    }
+
     // Products Filtering & Catalog
     public PageResponse<ProductDto> filterProducts(
             UUID categoryId,
@@ -82,16 +122,51 @@ public class ProductService {
             String search,
             Pageable pageable
     ) {
-        Page<Product> page = productRepository.filterProducts(
-                ProductStatus.ACTIVE,
-                categoryId,
-                vehicleModelId,
-                minPrice,
-                maxPrice,
-                brand,
-                search,
-                pageable
-        );
+        org.springframework.data.jpa.domain.Specification<Product> spec = (root, query, cb) -> {
+            java.util.List<jakarta.persistence.criteria.Predicate> predicates = new java.util.ArrayList<>();
+
+            predicates.add(cb.equal(root.get("status"), ProductStatus.ACTIVE));
+
+            if (categoryId != null) {
+                predicates.add(cb.equal(root.get("category").get("id"), categoryId));
+            }
+
+            if (vehicleModelId != null) {
+                jakarta.persistence.criteria.Subquery<Integer> subquery = query.subquery(Integer.class);
+                jakarta.persistence.criteria.Root<PartCompatibility> compatRoot = subquery.from(PartCompatibility.class);
+                subquery.select(cb.literal(1));
+                subquery.where(
+                        cb.equal(compatRoot.get("product").get("id"), root.get("id")),
+                        cb.equal(compatRoot.get("vehicleModel").get("id"), vehicleModelId)
+                );
+                predicates.add(cb.exists(subquery));
+            }
+
+            if (minPrice != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("price"), minPrice));
+            }
+
+            if (maxPrice != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("price"), maxPrice));
+            }
+
+            if (brand != null && !brand.trim().isEmpty()) {
+                predicates.add(cb.equal(cb.lower(root.get("brand")), brand.trim().toLowerCase()));
+            }
+
+            if (search != null && !search.trim().isEmpty()) {
+                String pattern = "%" + search.trim().toLowerCase() + "%";
+                jakarta.persistence.criteria.Predicate nameMatch = cb.like(cb.lower(root.get("name")), pattern);
+                jakarta.persistence.criteria.Predicate partNumberMatch = cb.like(cb.lower(root.get("partNumber")), pattern);
+                jakarta.persistence.criteria.Predicate descMatch = cb.like(cb.lower(root.get("description")), pattern);
+                jakarta.persistence.criteria.Predicate brandMatch = cb.like(cb.lower(root.get("brand")), pattern);
+                predicates.add(cb.or(nameMatch, partNumberMatch, descMatch, brandMatch));
+            }
+
+            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+
+        Page<Product> page = productRepository.findAll(spec, pageable);
 
         List<ProductDto> mapped = page.getContent().stream()
                 .map(this::mapProductToDto)
@@ -149,6 +224,7 @@ public class ProductService {
                 .price(request.getPrice())
                 .warrantyMonths(request.getWarrantyMonths() != null ? request.getWarrantyMonths() : 12)
                 .imageUrl(request.getImageUrl())
+                .rating(request.getRating() != null ? request.getRating() : 0.0)
                 .status(request.getStatus() != null ? ProductStatus.valueOf(request.getStatus()) : ProductStatus.ACTIVE)
                 .build();
 
@@ -203,9 +279,25 @@ public class ProductService {
         product.setPrice(request.getPrice());
         if (request.getWarrantyMonths() != null) product.setWarrantyMonths(request.getWarrantyMonths());
         if (request.getImageUrl() != null) product.setImageUrl(request.getImageUrl());
+        if (request.getRating() != null) product.setRating(request.getRating());
         if (request.getStatus() != null) product.setStatus(ProductStatus.valueOf(request.getStatus()));
 
         productRepository.save(product);
+
+        // Update compatible vehicle models
+        if (request.getCompatibleVehicleModelIds() != null) {
+            compatibilityRepository.deleteByProductId(product.getId());
+            for (UUID modelId : request.getCompatibleVehicleModelIds()) {
+                VehicleModel model = vehicleModelRepository.findById(modelId).orElse(null);
+                if (model != null) {
+                    compatibilityRepository.save(PartCompatibility.builder()
+                            .product(product)
+                            .vehicleModel(model)
+                            .notes("Compatible with " + model.getModelName())
+                            .build());
+                }
+            }
+        }
 
         auditLogService.logAction(adminUserId, "PRODUCT_UPDATED", "PRODUCT", product.getId().toString(),
                 "Updated product details for " + product.getPartNumber());
@@ -280,6 +372,7 @@ public class ProductService {
                 .price(product.getPrice())
                 .warrantyMonths(product.getWarrantyMonths())
                 .imageUrl(product.getImageUrl())
+                .rating(product.getRating() != null ? product.getRating() : 0.0)
                 .status(product.getStatus().name())
                 .availableQuantity(available)
                 .stockStatus(stockStatus)

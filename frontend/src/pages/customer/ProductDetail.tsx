@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../store/AuthContext';
 import { productService } from '../../services/productService';
 import { cartService } from '../../services/cartService';
+import { getImageUrl, handleImageError } from '../../services/api';
 import { Product, CompatibilityResponse } from '../../types';
 import {
   Package, ShoppingCart, CheckCircle, XCircle, Car, Shield,
@@ -14,11 +15,24 @@ const ProductDetail: React.FC = () => {
   const { activeVehicle } = useAuth();
   const navigate = useNavigate();
 
+  const renderStars = (rating: number | undefined) => {
+    const r = rating || 0;
+    const filledStars = Math.round(r);
+    const starString = '★'.repeat(filledStars) + '☆'.repeat(5 - filledStars);
+    return (
+      <div className="flex items-center gap-1.5 text-amber-400 text-base my-2">
+        <span className="tracking-wider">{starString}</span>
+        <span className="text-slate-300 text-sm font-semibold">{r.toFixed(1)}</span>
+      </div>
+    );
+  };
+
   const [product, setProduct] = useState<Product | null>(null);
   const [compatibility, setCompatibility] = useState<CompatibilityResponse | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
   const [addingToCart, setAddingToCart] = useState(false);
+  const [buyingNow, setBuyingNow] = useState(false);
   const [cartAdded, setCartAdded] = useState(false);
   const [error, setError] = useState('');
 
@@ -54,6 +68,19 @@ const ProductDetail: React.FC = () => {
       setError(err?.response?.data?.message || 'Failed to add to cart.');
     } finally {
       setAddingToCart(false);
+    }
+  };
+
+  const handleBuyNow = async () => {
+    if (!product) return;
+    setBuyingNow(true);
+    try {
+      await cartService.addToCart(product.id, quantity);
+      navigate('/customer/cart');
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Failed to process buy now.');
+    } finally {
+      setBuyingNow(false);
     }
   };
 
@@ -101,9 +128,9 @@ const ProductDetail: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Product Image */}
-        <div className="bg-slate-800 border border-slate-700 rounded-2xl flex items-center justify-center aspect-square">
+        <div className="bg-slate-800 border border-slate-700 rounded-2xl flex items-center justify-center aspect-square animate-fade-in">
           {product.imageUrl ? (
-            <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover rounded-2xl" />
+            <img src={getImageUrl(product.imageUrl)} alt={product.name} onError={handleImageError} className="w-full h-full object-cover rounded-2xl" />
           ) : (
             <Package className="w-24 h-24 text-slate-600" />
           )}
@@ -120,6 +147,7 @@ const ProductDetail: React.FC = () => {
             </div>
             <h1 className="text-2xl font-bold text-white">{product.name}</h1>
             <p className="text-slate-400 mt-1">by {product.brand}</p>
+            {renderStars(product.rating)}
           </div>
 
           <p className="text-3xl font-bold text-white">₹{product.price.toLocaleString('en-IN')}</p>
@@ -196,29 +224,39 @@ const ProductDetail: React.FC = () => {
             </div>
           )}
 
-          {/* Quantity + Add to Cart */}
+          {/* Quantity + Add to Cart + Buy Now */}
           {product.stockStatus !== 'OUT_OF_STOCK' && (
-            <div className="flex gap-3 items-center">
-              <div className="flex items-center bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
-                <button onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                  className="p-2.5 text-slate-400 hover:text-white hover:bg-slate-700 transition-all">
-                  <Minus className="w-4 h-4" />
-                </button>
-                <span className="w-12 text-center text-white font-semibold">{quantity}</span>
-                <button onClick={() => setQuantity(q => Math.min(product.availableQuantity, q + 1))}
-                  className="p-2.5 text-slate-400 hover:text-white hover:bg-slate-700 transition-all">
-                  <Plus className="w-4 h-4" />
+            <div className="space-y-3">
+              <div className="flex gap-3 items-center">
+                <div className="flex items-center bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+                  <button onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                    disabled={quantity <= 1}
+                    className="p-2.5 text-slate-400 hover:text-white hover:bg-slate-700 transition-all disabled:opacity-30">
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <span className="w-12 text-center text-white font-semibold">{quantity}</span>
+                  <button onClick={() => setQuantity(q => Math.min(product.availableQuantity, q + 1))}
+                    disabled={quantity >= product.availableQuantity}
+                    className="p-2.5 text-slate-400 hover:text-white hover:bg-slate-700 transition-all disabled:opacity-30">
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+                
+                <button onClick={handleAddToCart} disabled={addingToCart || buyingNow}
+                  className={`flex-1 py-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
+                    cartAdded
+                      ? 'bg-green-600 text-white'
+                      : 'bg-blue-600 hover:bg-blue-500 text-white disabled:bg-blue-800 disabled:cursor-not-allowed'
+                  }`}>
+                  {addingToCart ? <Loader2 className="w-4 h-4 animate-spin" /> :
+                   cartAdded ? <><CheckCircle className="w-4 h-4" /> Added!</> :
+                   <><ShoppingCart className="w-4 h-4" /> Add to Cart</>}
                 </button>
               </div>
-              <button onClick={handleAddToCart} disabled={addingToCart}
-                className={`flex-1 py-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
-                  cartAdded
-                    ? 'bg-green-600 text-white'
-                    : 'bg-blue-600 hover:bg-blue-500 text-white disabled:bg-blue-800 disabled:cursor-not-allowed'
-                }`}>
-                {addingToCart ? <Loader2 className="w-4 h-4 animate-spin" /> :
-                 cartAdded ? <><CheckCircle className="w-4 h-4" /> Added to Cart!</> :
-                 <><ShoppingCart className="w-4 h-4" /> Add to Cart</>}
+
+              <button onClick={handleBuyNow} disabled={addingToCart || buyingNow}
+                className="w-full bg-red-600 hover:bg-red-500 disabled:bg-red-800 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-all flex items-center justify-center gap-2">
+                {buyingNow ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Buy Now'}
               </button>
             </div>
           )}
