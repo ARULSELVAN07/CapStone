@@ -43,6 +43,7 @@ services:
       JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
       DEV_MODE_OTP_ENABLED: ${DEV_MODE_OTP_ENABLED:-true}
       DEV_MODE_OTP: ${DEV_MODE_OTP:-123456}
+      UPLOAD_DIR: /app/uploads
     volumes:
       - uploads_data:/app/uploads
     depends_on:

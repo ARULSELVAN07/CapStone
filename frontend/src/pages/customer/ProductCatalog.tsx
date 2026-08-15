@@ -224,12 +224,13 @@ const ProductCatalog: React.FC = () => {
           {products.map(product => (
             <div key={product.id} className="bg-slate-800 border border-slate-700 hover:border-slate-600 rounded-xl overflow-hidden transition-all group flex flex-col">
               <Link to={`/customer/catalog/${product.id}`} className="block p-4 flex-1">
-                <div className="w-full aspect-square bg-slate-700 rounded-lg mb-3 flex items-center justify-center group-hover:bg-slate-600 transition-colors">
-                  {product.imageUrl ? (
-                    <img src={getImageUrl(product.imageUrl)} alt={product.name} onError={handleImageError} className="w-full h-full object-cover rounded-lg" />
-                  ) : (
-                    <Package className="w-10 h-10 text-slate-500" />
-                  )}
+                <div className="w-full aspect-square bg-slate-700 rounded-lg mb-3 flex items-center justify-center group-hover:bg-slate-600 transition-colors overflow-hidden">
+                  <img
+                    src={getImageUrl(product.imageUrl, product.name)}
+                    alt={product.name}
+                    onError={handleImageError}
+                    className="w-full h-full object-cover rounded-lg"
+                  />
                 </div>
                 <div className="flex items-center justify-between mb-1">
                   {stockBadge(product.stockStatus)}

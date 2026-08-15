@@ -118,12 +118,13 @@ const CartPage: React.FC = () => {
         <div className="lg:col-span-2 space-y-3">
           {cart.items.map(item => (
             <div key={item.id} className="bg-slate-800 border border-slate-700 rounded-xl p-4 flex gap-4">
-              <div className="w-16 h-16 bg-slate-700 rounded-lg flex-shrink-0 flex items-center justify-center">
-                {item.product.imageUrl ? (
-                  <img src={getImageUrl(item.product.imageUrl)} alt={item.product.name} onError={handleImageError} className="w-full h-full object-cover rounded-lg" />
-                ) : (
-                  <Package className="w-7 h-7 text-slate-500" />
-                )}
+              <div className="w-16 h-16 bg-slate-700 rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center">
+                <img
+                  src={getImageUrl(item.product.imageUrl, item.product.name)}
+                  alt={item.product.name}
+                  onError={handleImageError}
+                  className="w-full h-full object-cover rounded-lg"
+                />
               </div>
               <div className="flex-1 min-w-0">
                 <Link to={`/customer/catalog/${item.product.id}`}

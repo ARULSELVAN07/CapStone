@@ -166,11 +166,12 @@ const OrderDetail: React.FC = () => {
               {order.items.map(item => (
                 <div key={item.id} className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg">
                   <div className="w-12 h-12 bg-slate-600 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
-                    {item.product?.imageUrl ? (
-                      <img src={getImageUrl(item.product.imageUrl)} alt={item.productName} onError={handleImageError} className="w-full h-full object-cover rounded-lg" />
-                    ) : (
-                      <Package className="w-5 h-5 text-slate-400" />
-                    )}
+                    <img
+                      src={getImageUrl(item.product?.imageUrl, item.productName)}
+                      alt={item.productName}
+                      onError={handleImageError}
+                      className="w-full h-full object-cover rounded-lg"
+                    />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-medium truncate">{item.productName}</p>

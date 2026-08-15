@@ -128,12 +128,13 @@ const ProductDetail: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Product Image */}
-        <div className="bg-slate-800 border border-slate-700 rounded-2xl flex items-center justify-center aspect-square animate-fade-in">
-          {product.imageUrl ? (
-            <img src={getImageUrl(product.imageUrl)} alt={product.name} onError={handleImageError} className="w-full h-full object-cover rounded-2xl" />
-          ) : (
-            <Package className="w-24 h-24 text-slate-600" />
-          )}
+        <div className="bg-slate-800 border border-slate-700 rounded-2xl flex items-center justify-center aspect-square animate-fade-in overflow-hidden">
+          <img
+            src={getImageUrl(product.imageUrl, product.name)}
+            alt={product.name}
+            onError={handleImageError}
+            className="w-full h-full object-cover rounded-2xl"
+          />
         </div>
 
         {/* Product Info */}

@@ -313,7 +313,7 @@ export const AdminProducts: React.FC = () => {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <img
-                          src={getImageUrl(p.imageUrl)}
+                          src={getImageUrl(p.imageUrl, p.name)}
                           alt={p.name}
                           onError={handleImageError}
                           className="w-10 h-10 rounded-lg object-cover bg-slate-900 border border-slate-700"
@@ -505,7 +505,7 @@ export const AdminProducts: React.FC = () => {
                 {formData.imageUrl && (
                   <div className="mb-3 relative w-32 h-32 rounded-lg overflow-hidden border border-slate-700 bg-slate-900 group">
                     <img 
-                      src={getImageUrl(formData.imageUrl)} 
+                      src={getImageUrl(formData.imageUrl, formData.name)} 
                       alt="Preview" 
                       onError={handleImageError}
                       className="w-full h-full object-cover"

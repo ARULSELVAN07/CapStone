@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getProductImage } from './imageMap';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
@@ -49,24 +50,54 @@ api.interceptors.response.use(
   }
 );
 
-export const DEFAULT_PRODUCT_IMAGE = 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80';
+// Reliable fallback image — picsum delivers consistent CORS-safe images
+export const DEFAULT_PRODUCT_IMAGE = 'https://picsum.photos/seed/bmwpart/600/600';
 
-export const getImageUrl = (url: string | null | undefined): string => {
-  if (!url || url.trim() === '') return DEFAULT_PRODUCT_IMAGE;
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1';
-  let host = '';
-  if (baseUrl.startsWith('http://') || baseUrl.startsWith('https://')) {
-    host = baseUrl.replace(/\/api\/v1\/?$/, '');
+/**
+ * Resolve any imageUrl value to a fully-renderable src string.
+ *
+ * Resolution priority:
+ *  1. Local bundled image matched by productName (works on every machine after git pull)
+ *  2. /uploads/<uuid> path → prepend the backend origin (uploaded via admin panel)
+ *  3. Full http(s):// URL → returned as-is
+ *  4. DEFAULT_PRODUCT_IMAGE (picsum fallback) when nothing else matches
+ *
+ * @param url         The imageUrl field stored in the database.
+ * @param productName Optional product name used to resolve a locally-bundled image.
+ */
+export const getImageUrl = (
+  url: string | null | undefined,
+  productName?: string | null
+): string => {
+  // 1. Always prefer the locally-bundled image when a product name is supplied.
+  //    These images are committed to Git and bundled by Vite — guaranteed present.
+  if (productName) {
+    const local = getProductImage(productName);
+    if (local) return local;
   }
-  return `${host}${url.startsWith('/') ? url : '/' + url}`;
+
+  // 2. Explicit /uploads/ path from the backend file store.
+  if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+    let origin = '';
+    if (baseUrl.startsWith('http://') || baseUrl.startsWith('https://')) {
+      origin = baseUrl.replace(/\/api\/v1\/?$/, '');
+    }
+    return `${origin}${url.startsWith('/') ? url : '/' + url}`;
+  }
+
+  // 3. External URL (http / https) — return as-is.
+  if (url && (url.startsWith('http://') || url.startsWith('https://'))) return url;
+
+  // 4. Absolute fallback.
+  return DEFAULT_PRODUCT_IMAGE;
 };
 
 export const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
   const target = e.currentTarget;
-  if (target.src !== DEFAULT_PRODUCT_IMAGE) {
-    target.onerror = null; // prevent looping if fallback fails
+  // Only replace once to prevent infinite loops if the fallback itself fails
+  if (target.src !== DEFAULT_PRODUCT_IMAGE && !target.src.includes('picsum.photos')) {
+    target.onerror = null;
     target.src = DEFAULT_PRODUCT_IMAGE;
   }
 };

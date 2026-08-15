@@ -125,8 +125,8 @@ public class AdminManagementController {
         }
 
         try {
-            // Ensure directory exists
-            Path uploadDir = Paths.get("uploads");
+            // Ensure directory exists (resolves same path as resource handler)
+            Path uploadDir = com.bmw.sparehub.config.WebMvcConfig.resolveUploadDir();
             if (!Files.exists(uploadDir)) {
                 Files.createDirectories(uploadDir);
             }
@@ -143,7 +143,7 @@ public class AdminManagementController {
             // Save file
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
-            // Construct response path
+            // Construct response path — always a root-relative URL for the frontend
             String fileUrl = "/uploads/" + newFilename;
             Map<String, String> responseData = new HashMap<>();
             responseData.put("imageUrl", fileUrl);
