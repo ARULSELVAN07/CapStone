@@ -35,6 +35,29 @@ export const productService = {
   async checkCompatibility(productId: string, vehicleId: string): Promise<CompatibilityResponse> {
     const res = await api.get<ApiResponse<CompatibilityResponse>>(`/products/${productId}/compatibility/${vehicleId}`);
     return res.data.data;
+  },
+
+  async getSimilarProducts(productId: string, vehicleModelId?: string, limit: number = 6): Promise<Product[]> {
+    const params: any = { limit };
+    if (vehicleModelId) {
+      params.vehicleModelId = vehicleModelId;
+    }
+    const res = await api.get<ApiResponse<Product[]>>(`/recommendations/similar/${productId}`, { params });
+    return res.data.data || [];
+  },
+
+  async getTrendingProducts(limit: number = 10, vehicleModelId?: string): Promise<Product[]> {
+    const params: any = { limit };
+    if (vehicleModelId) {
+      params.vehicleModelId = vehicleModelId;
+    }
+    const res = await api.get<ApiResponse<Product[]>>('/recommendations/trending', { params });
+    return res.data.data || [];
+  },
+
+  async getModelEvaluation(): Promise<any> {
+    const res = await api.get<ApiResponse<any>>('/recommendations/experiments/evaluation');
+    return res.data.data;
   }
 };
 

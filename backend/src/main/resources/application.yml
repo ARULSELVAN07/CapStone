@@ -45,3 +45,8 @@ springdoc:
     path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
+
+recommendation:
+  service:
+    url: ${RECOMMENDATION_SERVICE_URL:http://localhost:8000}
+

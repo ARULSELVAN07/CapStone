@@ -7,7 +7,7 @@ import { getImageUrl, handleImageError } from '../../services/api';
 import { Product, CompatibilityResponse } from '../../types';
 import {
   Package, ShoppingCart, CheckCircle, XCircle, Car, Shield,
-  ArrowLeft, Plus, Minus, Loader2, AlertCircle, Star
+  ArrowLeft, Plus, Minus, Loader2, AlertCircle, Star, Sparkles, Cpu, Layers, Info
 } from 'lucide-react';
 
 const ProductDetail: React.FC = () => {
@@ -29,6 +29,10 @@ const ProductDetail: React.FC = () => {
 
   const [product, setProduct] = useState<Product | null>(null);
   const [compatibility, setCompatibility] = useState<CompatibilityResponse | null>(null);
+  const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
+  const [loadingSimilar, setLoadingSimilar] = useState(false);
+  const [showMlMetrics, setShowMlMetrics] = useState(false);
+  const [mlMetrics, setMlMetrics] = useState<any>(null);
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
   const [addingToCart, setAddingToCart] = useState(false);
@@ -54,7 +58,22 @@ const ProductDetail: React.FC = () => {
         setLoading(false);
       }
     };
+
+    const fetchSimilar = async () => {
+      setLoadingSimilar(true);
+      try {
+        const vehicleModelId = activeVehicle?.vehicleModel?.id;
+        const recs = await productService.getSimilarProducts(id, vehicleModelId, 6);
+        setSimilarProducts(recs);
+      } catch (e) {
+        console.error('Failed to fetch similar products:', e);
+      } finally {
+        setLoadingSimilar(false);
+      }
+    };
+
     fetchProduct();
+    fetchSimilar();
   }, [id, activeVehicle]);
 
   const handleAddToCart = async () => {
@@ -285,6 +304,173 @@ const ProductDetail: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Similar & Complementary Products Recommendation */}
+      {similarProducts.length > 0 && (
+        <div className="mt-12 pt-8 border-t border-slate-800">
+          <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-blue-400" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-bold text-white">Similar & Complementary Parts</h2>
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                    ML Engine v1.1
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Ranked by Scikit-Learn TF-IDF semantic embeddings & BMW vehicle compatibility tensor
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={async () => {
+                if (!mlMetrics) {
+                  try {
+                    const data = await productService.getModelEvaluation();
+                    setMlMetrics(data);
+                  } catch (err) {
+                    console.error('Failed to load ML metrics:', err);
+                  }
+                }
+                setShowMlMetrics(!showMlMetrics);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-750 border border-slate-700 text-xs font-semibold text-slate-300 hover:text-white transition-all shadow-sm"
+            >
+              <Cpu className="w-3.5 h-3.5 text-blue-400" />
+              {showMlMetrics ? 'Hide ML Diagnostics' : 'ML Model Insights'}
+            </button>
+          </div>
+
+          {/* ML Model Insights Panel */}
+          {showMlMetrics && mlMetrics && (
+            <div className="mb-6 p-4 rounded-xl bg-slate-850 border border-blue-500/30 shadow-lg text-xs space-y-3 animate-fade-in">
+              <div className="flex items-center justify-between border-b border-slate-700/60 pb-2">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-blue-400" />
+                  <span className="font-bold text-white text-sm">{mlMetrics.model_architecture}</span>
+                </div>
+                <span className="text-slate-400 font-mono">Vocab Size: {mlMetrics.vectorizer_config?.vocabulary_size} terms</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-slate-800 p-2.5 rounded-lg border border-slate-700">
+                  <p className="text-slate-400 text-[11px]">Feature Matrix Shape</p>
+                  <p className="text-white font-mono font-bold text-sm mt-0.5">
+                    {mlMetrics.dataset_metrics?.feature_matrix_shape?.join(' × ')}
+                  </p>
+                </div>
+                <div className="bg-slate-800 p-2.5 rounded-lg border border-slate-700">
+                  <p className="text-slate-400 text-[11px]">Matrix Sparsity</p>
+                  <p className="text-amber-400 font-mono font-bold text-sm mt-0.5">
+                    {mlMetrics.dataset_metrics?.matrix_sparsity_percent}%
+                  </p>
+                </div>
+                <div className="bg-slate-800 p-2.5 rounded-lg border border-slate-700">
+                  <p className="text-slate-400 text-[11px]">Mean Cosine Sim</p>
+                  <p className="text-blue-400 font-mono font-bold text-sm mt-0.5">
+                    {mlMetrics.similarity_distribution?.mean_cosine_similarity?.toFixed(4)}
+                  </p>
+                </div>
+                <div className="bg-slate-800 p-2.5 rounded-lg border border-slate-700">
+                  <p className="text-slate-400 text-[11px]">Max Pairwise Sim</p>
+                  <p className="text-green-400 font-mono font-bold text-sm mt-0.5">
+                    {mlMetrics.similarity_distribution?.max_cosine_similarity?.toFixed(4)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Feature Weights */}
+              <div className="bg-slate-800/60 p-2.5 rounded-lg border border-slate-700/60">
+                <p className="text-slate-400 font-semibold mb-1 text-[11px]">Feature Weights Distribution:</p>
+                <div className="flex flex-wrap gap-2 text-[10px]">
+                  <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded">Compatibility: 40%</span>
+                  <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded">TF-IDF NLP: 30%</span>
+                  <span className="px-2 py-0.5 bg-green-500/20 text-green-300 rounded">Brand Match: 15%</span>
+                  <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded">Price Proximity: 10%</span>
+                  <span className="px-2 py-0.5 bg-rose-500/20 text-rose-300 rounded">Rating: 5%</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {similarProducts.map((item) => {
+              const isCompatibleWithActive = activeVehicle
+                ? item.compatibleModels?.some(m => m.id === activeVehicle.vehicleModel.id)
+                : null;
+              
+              const matchPct = Math.round((item.recommendationScore || 0.85) * 100);
+
+              return (
+                <Link
+                  key={item.id}
+                  to={`/customer/products/${item.id}`}
+                  className="group bg-slate-800/80 hover:bg-slate-750 border border-slate-700 hover:border-blue-500/50 rounded-xl p-3 flex flex-col transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-blue-500/5 relative"
+                >
+                  {/* ML Match Score Chip */}
+                  <div className="absolute top-2 left-2 z-10">
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shadow ${
+                      matchPct >= 90
+                        ? 'bg-emerald-500 text-slate-950 font-extrabold'
+                        : matchPct >= 75
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-slate-700 text-slate-200'
+                    }`}>
+                      {matchPct}% Match
+                    </span>
+                  </div>
+
+                  <div className="aspect-square w-full rounded-lg bg-slate-900 overflow-hidden mb-2.5 flex items-center justify-center">
+                    <img
+                      src={getImageUrl(item.imageUrl, item.name)}
+                      alt={item.name}
+                      onError={handleImageError}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  </div>
+
+                  <div className="flex-1 flex flex-col justify-between">
+                    <div>
+                      <div className="text-[10px] text-slate-400 font-mono mb-1 truncate">
+                        {item.partNumber}
+                      </div>
+                      <h4 className="text-white text-xs font-semibold line-clamp-2 group-hover:text-blue-400 transition-colors">
+                        {item.name}
+                      </h4>
+                      {item.matchReason && (
+                        <p className="text-[10px] text-slate-400 mt-1 line-clamp-1 truncate">
+                          {item.matchReason}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="mt-3 pt-2 border-t border-slate-700/60 flex items-center justify-between">
+                      <p className="text-xs font-bold text-white">
+                        ₹{item.price.toLocaleString('en-IN')}
+                      </p>
+                      {isCompatibleWithActive !== null && (
+                        <span
+                          className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
+                            isCompatibleWithActive
+                              ? 'bg-green-500/20 text-green-400'
+                              : 'bg-slate-700 text-slate-400'
+                          }`}
+                        >
+                          {isCompatibleWithActive ? 'Fits Vehicle' : 'Check Fit'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

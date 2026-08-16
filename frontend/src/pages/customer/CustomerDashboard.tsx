@@ -5,6 +5,8 @@ import { vehicleService } from '../../services/vehicleService';
 import { orderService } from '../../services/orderService';
 import { Car, Package, ClipboardList, ShoppingCart, Plus, ChevronRight, CheckCircle, Clock, Truck, Wrench } from 'lucide-react';
 import { Order, Vehicle } from '../../types';
+import TrendingSection from './TrendingSection';
+import DashboardSlider from './DashboardSlider';
 
 const CustomerDashboard: React.FC = () => {
   const { user, activeVehicle, setActiveVehicle } = useAuth();
@@ -50,6 +52,9 @@ const CustomerDashboard: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Hero Showcase Slider */}
+      <DashboardSlider />
+
       {/* Welcome Banner */}
       <div className="bg-gradient-to-r from-blue-600/20 to-slate-800 border border-blue-600/20 rounded-2xl p-6">
         <h1 className="text-2xl font-bold text-white">Welcome back, {user?.name?.split(' ')[0]}! 👋</h1>
@@ -110,6 +115,9 @@ const CustomerDashboard: React.FC = () => {
           <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-amber-400 transition-colors self-end mt-auto" />
         </Link>
       </div>
+
+      {/* Trending Products Recommendation Section */}
+      <TrendingSection activeVehicle={activeVehicle} />
 
       {/* Vehicles & Recent Orders */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

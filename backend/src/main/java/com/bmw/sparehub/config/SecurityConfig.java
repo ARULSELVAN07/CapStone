@@ -48,8 +48,8 @@ public class SecurityConfig {
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/uploads/**").permitAll()
                 
-                // Public product catalog & models reading
-                .requestMatchers(HttpMethod.GET, "/api/v1/products/**", "/api/v1/categories/**", "/api/v1/vehicle-models/**").permitAll()
+                // Public product catalog, models & recommendations
+                .requestMatchers(HttpMethod.GET, "/api/v1/products/**", "/api/v1/categories/**", "/api/v1/vehicle-models/**", "/api/v1/recommendations/**").permitAll()
                 
                 // Role-restricted portals
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")

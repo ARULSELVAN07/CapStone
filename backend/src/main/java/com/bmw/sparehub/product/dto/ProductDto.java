@@ -29,4 +29,7 @@ public class ProductDto {
     private Integer availableQuantity;
     private String stockStatus; // IN_STOCK, LOW_STOCK, OUT_OF_STOCK
     private List<VehicleModelDto> compatibleModels;
+    private Double recommendationScore;
+    private String matchReason;
 }
+

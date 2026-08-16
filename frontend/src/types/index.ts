@@ -64,6 +64,8 @@ export interface Product {
   availableQuantity: number;
   stockStatus: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK';
   compatibleModels?: VehicleModel[];
+  recommendationScore?: number;
+  matchReason?: string;
 }
 
 export interface CompatibilityResponse {

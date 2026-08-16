@@ -27,6 +27,24 @@ services:
       timeout: 5s
       retries: 5
 
+  recommendation-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.recommendation
+    container_name: sparehub-recommendation
+    restart: always
+    ports:
+      - "8002:8000"
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-sparehub_db}
+      POSTGRES_USER: ${POSTGRES_USER:-sparehub_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sparehub_secure_pass_2026}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   backend:
     build:
       context: .
@@ -44,11 +62,14 @@ services:
       DEV_MODE_OTP_ENABLED: ${DEV_MODE_OTP_ENABLED:-true}
       DEV_MODE_OTP: ${DEV_MODE_OTP:-123456}
       UPLOAD_DIR: /app/uploads
+      RECOMMENDATION_SERVICE_URL: http://recommendation-service:8000
     volumes:
       - uploads_data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
+      recommendation-service:
+        condition: service_started
 
   frontend:
     build:
