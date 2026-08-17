@@ -31,5 +31,6 @@ public class ProductDto {
     private List<VehicleModelDto> compatibleModels;
     private Double recommendationScore;
     private String matchReason;
+    private java.util.Map<String, Object> matchFactors;
 }
 

@@ -53,9 +53,9 @@ public class RecommendationController {
             );
             return ResponseEntity.ok(ApiResponse.success(response.getBody(), "Similar products fetched successfully"));
         } catch (Exception e) {
-            log.warn("Recommendation service unavailable at {}. Falling back to default list: {}", baseServiceUrl, e.getMessage());
-            // Graceful fallback: return empty list or basic category-matched products
-            return ResponseEntity.ok(ApiResponse.success(Collections.emptyList(), "Fallback similar products"));
+            log.warn("Recommendation service unavailable at {}. Using Java fallback for similar products: {}", baseServiceUrl, e.getMessage());
+            List<ProductDto> fallback = productService.getFallbackSimilarProducts(productId, vehicleModelId, limit);
+            return ResponseEntity.ok(ApiResponse.success(fallback, "Recommended similar products (offline mode)"));
         }
     }
 
@@ -82,8 +82,9 @@ public class RecommendationController {
             );
             return ResponseEntity.ok(ApiResponse.success(response.getBody(), "Trending products fetched successfully"));
         } catch (Exception e) {
-            log.warn("Recommendation service unavailable at {}. Falling back to default list: {}", baseServiceUrl, e.getMessage());
-            return ResponseEntity.ok(ApiResponse.success(Collections.emptyList(), "Fallback trending products"));
+            log.warn("Recommendation service unavailable at {}. Using Java fallback for trending products: {}", baseServiceUrl, e.getMessage());
+            List<ProductDto> fallback = productService.getFallbackTrendingProducts(vehicleModelId, limit);
+            return ResponseEntity.ok(ApiResponse.success(fallback, "Trending products (offline mode)"));
         }
     }
 

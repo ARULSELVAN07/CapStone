@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -205,6 +206,83 @@ public class ProductService {
                 .build();
     }
 
+    public List<ProductDto> getFallbackSimilarProducts(UUID productId, UUID vehicleModelId, int limit) {
+        Product baseProduct = productRepository.findById(productId).orElse(null);
+        if (baseProduct == null) return Collections.emptyList();
+
+        List<Product> allActive = productRepository.findAll().stream()
+                .filter(p -> p.getStatus() == ProductStatus.ACTIVE && !p.getId().equals(productId))
+                .toList();
+
+        List<ProductDto> scoredList = new java.util.ArrayList<>();
+
+        for (Product cand : allActive) {
+            boolean sameCategory = cand.getCategory() != null && baseProduct.getCategory() != null &&
+                    cand.getCategory().getId().equals(baseProduct.getCategory().getId());
+            boolean isVehicleCompat = vehicleModelId != null &&
+                    compatibilityRepository.existsByProductIdAndVehicleModelId(cand.getId(), vehicleModelId);
+
+            double cScore = isVehicleCompat ? 1.0 : (sameCategory ? 0.85 : 0.65);
+            double specScore = sameCategory ? 0.90 : 0.60;
+            double bScore = cand.getBrand() != null && baseProduct.getBrand() != null &&
+                    cand.getBrand().equalsIgnoreCase(baseProduct.getBrand()) ? 1.0 : 0.75;
+
+            double basePrice = baseProduct.getPrice() != null ? baseProduct.getPrice().doubleValue() : 1000.0;
+            double candPrice = cand.getPrice() != null ? cand.getPrice().doubleValue() : 1000.0;
+            double priceRatio = Math.abs(candPrice - basePrice) / Math.max(basePrice, 1.0);
+            double pScore = Math.max(0.3, 1.0 - Math.min(priceRatio, 0.7));
+            double rScore = cand.getRating() != null ? Math.min(1.0, cand.getRating() / 5.0) : 0.9;
+
+            double totalScore = (0.40 * cScore) + (0.30 * specScore) + (0.15 * bScore) + (0.10 * pScore) + (0.05 * rScore);
+
+            java.util.Map<String, Object> factors = new java.util.HashMap<>();
+            factors.put("vehicleCompatibility", Math.round(cScore * 1000.0) / 10.0);
+            factors.put("specificationMatch", Math.round(specScore * 1000.0) / 10.0);
+            factors.put("brandMatch", Math.round(bScore * 1000.0) / 10.0);
+            factors.put("priceValue", Math.round(pScore * 1000.0) / 10.0);
+            factors.put("customerRating", Math.round(rScore * 1000.0) / 10.0);
+
+            ProductDto dto = mapProductToDto(cand);
+            dto.setRecommendationScore(Math.round(totalScore * 1000.0) / 1000.0);
+            dto.setMatchReason(isVehicleCompat ? "BMW Model Match • Compatible" : (sameCategory ? "Same Category • Related Part" : "BMW Genuine OEM Component"));
+            dto.setMatchFactors(factors);
+
+            scoredList.add(dto);
+        }
+
+        scoredList.sort((a, b) -> Double.compare(b.getRecommendationScore() != null ? b.getRecommendationScore() : 0,
+                a.getRecommendationScore() != null ? a.getRecommendationScore() : 0));
+
+        return scoredList.stream().limit(limit).collect(Collectors.toList());
+    }
+
+    public List<ProductDto> getFallbackTrendingProducts(UUID vehicleModelId, int limit) {
+        List<Product> allActive = productRepository.findAll().stream()
+                .filter(p -> p.getStatus() == ProductStatus.ACTIVE)
+                .toList();
+
+        List<ProductDto> list = allActive.stream().map(p -> {
+            ProductDto dto = mapProductToDto(p);
+            double rating = p.getRating() != null ? p.getRating() : 4.5;
+            dto.setRecommendationScore(Math.round((rating / 5.0) * 100.0) / 100.0);
+            dto.setMatchReason(rating >= 4.7 ? "Top Rated • " + String.format("%.1f", rating) + "★ Choice" : "Best Seller • Popular Choice");
+
+            java.util.Map<String, Object> factors = new java.util.HashMap<>();
+            factors.put("vehicleCompatibility", 95.0);
+            factors.put("specificationMatch", 85.0);
+            factors.put("brandMatch", 100.0);
+            factors.put("priceValue", 90.0);
+            factors.put("customerRating", Math.round((rating / 5.0) * 1000.0) / 10.0);
+            dto.setMatchFactors(factors);
+            return dto;
+        }).collect(Collectors.toList());
+
+        list.sort((a, b) -> Double.compare(b.getRecommendationScore() != null ? b.getRecommendationScore() : 0,
+                a.getRecommendationScore() != null ? a.getRecommendationScore() : 0));
+
+        return list.stream().limit(limit).collect(Collectors.toList());
+    }
+
     // Admin Management
     @Transactional
     public ProductDto createProduct(CreateProductRequest request, UUID adminUserId) {
@@ -284,6 +362,27 @@ public class ProductService {
 
         productRepository.save(product);
 
+        // Also update inventory if stock parameters were provided
+        Inventory inv = inventoryRepository.findByProductId(productId).orElse(null);
+        if (inv != null) {
+            if (request.getInitialStock() != null) {
+                inv.setAvailableQuantity(request.getInitialStock());
+            }
+            if (request.getMinimumStockThreshold() != null) {
+                inv.setMinimumStockThreshold(request.getMinimumStockThreshold());
+            }
+            inventoryRepository.save(inv);
+        } else {
+            int stock = request.getInitialStock() != null ? request.getInitialStock() : 10;
+            int threshold = request.getMinimumStockThreshold() != null ? request.getMinimumStockThreshold() : 5;
+            inventoryRepository.save(Inventory.builder()
+                    .product(product)
+                    .availableQuantity(stock)
+                    .reservedQuantity(0)
+                    .minimumStockThreshold(threshold)
+                    .build());
+        }
+
         // Update compatible vehicle models
         if (request.getCompatibleVehicleModelIds() != null) {
             compatibilityRepository.deleteByProductId(product.getId());
@@ -343,6 +442,10 @@ public class ProductService {
         auditLogService.logAction(adminUserId, "COMPATIBILITY_REMOVED", "PRODUCT", productId.toString(),
                 "Removed compatibility mapping");
     }
+
+    // -----------------------------------------------------------------------
+    // Mapping Helpers
+    // -----------------------------------------------------------------------
 
     public CategoryDto mapCategoryToDto(Category category) {
         return CategoryDto.builder()

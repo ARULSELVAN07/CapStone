@@ -89,6 +89,8 @@ export const App: React.FC = () => {
         <Route path="vehicles" element={<VehicleManagement />} />
         <Route path="catalog" element={<ProductCatalog />} />
         <Route path="catalog/:id" element={<ProductDetail />} />
+        <Route path="products" element={<ProductCatalog />} />
+        <Route path="products/:id" element={<ProductDetail />} />
         <Route path="cart" element={<CartPage />} />
         <Route path="checkout" element={<CheckoutPage />} />
         <Route path="orders" element={<OrderHistory />} />

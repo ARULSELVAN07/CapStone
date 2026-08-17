@@ -13,12 +13,14 @@ interface TrendingSectionProps {
 export const TrendingSection: React.FC<TrendingSectionProps> = ({ activeVehicle }) => {
   const [trendingProducts, setTrendingProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [addedIds, setAddedIds] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let isMounted = true;
     const fetchTrending = async () => {
       setLoading(true);
+      setError(false);
       try {
         const vehicleModelId = activeVehicle?.vehicleModel?.id;
         const products = await productService.getTrendingProducts(8, vehicleModelId);
@@ -27,6 +29,7 @@ export const TrendingSection: React.FC<TrendingSectionProps> = ({ activeVehicle 
         }
       } catch (err) {
         console.error('Failed to load trending products:', err);
+        if (isMounted) setError(true);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -72,9 +75,6 @@ export const TrendingSection: React.FC<TrendingSectionProps> = ({ activeVehicle 
     );
   }
 
-  if (trendingProducts.length === 0) {
-    return null;
-  }
 
   return (
     <div className="bg-gradient-to-br from-slate-800 via-slate-800/95 to-slate-900 border border-slate-700/80 rounded-2xl p-6 shadow-xl relative overflow-hidden">
@@ -107,7 +107,25 @@ export const TrendingSection: React.FC<TrendingSectionProps> = ({ activeVehicle 
         </Link>
       </div>
 
+      {/* Error / Empty State */}
+      {!loading && (error || trendingProducts.length === 0) && (
+        <div className="flex flex-col items-center justify-center py-14 text-center relative z-10">
+          <div className="w-14 h-14 rounded-2xl bg-slate-700/60 border border-slate-600 flex items-center justify-center mb-4">
+            <Flame className="w-6 h-6 text-slate-500" />
+          </div>
+          <p className="text-slate-300 text-sm font-semibold">
+            {error ? 'Could not load trending parts' : 'No trending parts yet'}
+          </p>
+          <p className="text-slate-500 text-xs mt-1">
+            {error
+              ? 'The recommendation service is temporarily unavailable. Please try again shortly.'
+              : 'Trending data will appear here as orders and cart activity build up.'}
+          </p>
+        </div>
+      )}
+
       {/* Grid of Trending Cards */}
+      {!loading && !error && trendingProducts.length > 0 && (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 relative z-10">
         {trendingProducts.map((product, idx) => {
           const isAdded = !!addedIds[product.id];
@@ -116,7 +134,7 @@ export const TrendingSection: React.FC<TrendingSectionProps> = ({ activeVehicle 
           return (
             <Link
               key={product.id}
-              to={`/customer/products/${product.id}`}
+              to={`/customer/catalog/${product.id}`}
               className="group bg-slate-800/90 hover:bg-slate-750 border border-slate-700/70 hover:border-amber-500/40 rounded-xl p-3.5 flex flex-col transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/5 hover:-translate-y-0.5 relative"
             >
               {/* Rank Badge */}
@@ -196,6 +214,7 @@ export const TrendingSection: React.FC<TrendingSectionProps> = ({ activeVehicle 
           );
         })}
       </div>
+      )}
     </div>
   );
 };

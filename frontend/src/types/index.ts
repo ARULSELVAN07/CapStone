@@ -49,6 +49,14 @@ export interface Category {
   active: boolean;
 }
 
+export interface MatchFactors {
+  vehicleCompatibility?: number;
+  specificationMatch?: number;
+  brandMatch?: number;
+  priceValue?: number;
+  customerRating?: number;
+}
+
 export interface Product {
   id: string;
   category: Category;
@@ -66,6 +74,7 @@ export interface Product {
   compatibleModels?: VehicleModel[];
   recommendationScore?: number;
   matchReason?: string;
+  matchFactors?: MatchFactors;
 }
 
 export interface CompatibilityResponse {

@@ -318,10 +318,14 @@ public class OrderService {
         order.setStatus(nextStatus);
         orderRepository.save(order);
 
-        // Sync fulfillment tables if applicable
+        // Sync inventory & fulfillment tables if applicable
         if (nextStatus == OrderStatus.CANCELLED) {
             for (OrderItem item : order.getItems()) {
                 inventoryService.releaseReservedStock(item.getProduct().getId(), item.getQuantity());
+            }
+        } else if (nextStatus == OrderStatus.COMPLETED || nextStatus == OrderStatus.DELIVERED || nextStatus == OrderStatus.INSTALLATION_COMPLETED) {
+            for (OrderItem item : order.getItems()) {
+                inventoryService.commitReservedStock(item.getProduct().getId(), item.getQuantity());
             }
         }
 

@@ -241,8 +241,18 @@ const ProductCatalog: React.FC = () => {
                 {renderStars(product.rating)}
                 
                 <div className="mt-2 mb-1">
-                  <span className={`text-xs font-semibold ${product.availableQuantity > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    {product.availableQuantity > 0 ? `Available Stock: ${product.availableQuantity}` : 'Out of Stock'}
+                  <span className={`text-xs font-semibold ${
+                    product.availableQuantity > 5
+                      ? 'text-emerald-400'
+                      : product.availableQuantity > 0
+                      ? 'text-amber-400'
+                      : 'text-rose-400'
+                  }`}>
+                    {product.availableQuantity > 5
+                      ? `Available Stock: ${product.availableQuantity}`
+                      : product.availableQuantity > 0
+                      ? `Low Stock: Only ${product.availableQuantity} left!`
+                      : 'Out of Stock'}
                   </span>
                 </div>
 
