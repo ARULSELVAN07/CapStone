@@ -4,11 +4,11 @@ on:
   push:
     paths:
       - "java-service/**"
-      - ".github/workflows/java-service.yaml"
+      - ".github/workflows/java-service.yml"
   pull_request:
     paths:
       - "java-service/**"
-      - ".github/workflows/java-service.yaml"
+      - ".github/workflows/java-service.yml"
 
 jobs:
   build:
@@ -18,6 +18,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check project structure
+        run: |
+          pwd
+          ls -la
+          find . -name pom.xml
+
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
@@ -26,9 +32,9 @@ jobs:
           cache: maven
 
       - name: Build
-        working-directory: java-service
+        working-directory: ./java-service
         run: mvn clean package -DskipTests
 
       - name: Test
-        working-directory: java-service
+        working-directory: ./java-service
         run: mvn test
